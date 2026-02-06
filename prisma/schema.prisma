@@ -1,14 +1,117 @@
+datasource db {
+  provider = "postgresql"
+}
+
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
-datasource db {
-  provider = "postgresql"
+model Matcha {
+  id          String   @id @default(cuid(2))
+  name        String
+  brandId     String
+  description String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brand    Brand     @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  listings Listing[]
+
+  @@unique([brandId, name])
 }
 
-model Todo {
-  id        Int      @id @default(autoincrement())
-  title     String
+model Brand {
+  id          String   @id @default(cuid(2))
+  name        String   @unique
+  imageUrl    String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  matchas     Matcha[]
+  storefronts Storefront[]
+}
+
+model Listing {
+  id           String    @id @default(cuid(2))
+  matchaId     String
+  storefrontId String
+  url          String    @unique
+  variantId    String? /// Shopify variant ID (if applicable)
+  price        String?
+  isActive     Boolean   @default(true)
+  lastStock    Boolean?
+  lastChecked  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  matcha          Matcha                       @relation(fields: [matchaId], references: [id], onDelete: Cascade)
+  storefront      Storefront                   @relation(fields: [storefrontId], references: [id], onDelete: Restrict)
+  stockHistory    StockHistory[]
+  userPreferences UserNotificationPreference[]
+
+  @@unique([matchaId, storefrontId])
+}
+
+model Storefront {
+  id          String   @id @default(cuid(2))
+  name        String   @unique
+  url         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brands   Brand[]
+  listings Listing[]
+}
+
+model StockHistory {
+  id        String   @id @default(cuid(2))
+  listingId String
+  inStock   Boolean
+  price     String? // Price at time of check
+  scrapedAt DateTime @default(now())
+  error     String?
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id             String   @id
+  email          String   @unique
+  telegramChatId String?
+  role           Role     @default(USER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  notificationPreferences UserNotificationPreference[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model UserNotificationPreference {
+  id        String   @id @default(cuid(2))
+  userId    String
+  listingId String
   createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+}
+
+model ScrapeJob {
+  id              String    @id @default(cuid(2))
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  listingsChecked Int       @default(0)
+  listingsChanged Int       @default(0)
+  errors          String[]
+  success         Boolean   @default(false)
 }
