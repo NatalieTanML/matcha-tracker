@@ -1,26 +1,24 @@
 import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
-import { createPrismaClient } from "@/db";
+import { desc, eq } from "drizzle-orm";
+import { createDb } from "@/db";
+import { listings } from "@/db/schema";
 
 export const getListings = createServerFn({
   method: "GET",
 }).handler(async () => {
-  const prisma = createPrismaClient(env as { DATABASE_URL: string });
-  const listings = await prisma.listing.findMany({
-    where: {
-      isActive: true,
-    },
-    include: {
+  const db = createDb(env.DATABASE_URL);
+  const result = await db.query.listings.findMany({
+    where: eq(listings.isActive, true),
+    with: {
       matcha: {
-        include: {
+        with: {
           brand: true,
         },
       },
       storefront: true,
     },
-    orderBy: {
-      lastChecked: "desc",
-    },
+    orderBy: desc(listings.lastChecked),
   });
-  return listings;
+  return result;
 });
