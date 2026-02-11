@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "matcha-tracker",
+  "compatibility_date": "2025-02-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./src/server/worker.ts",
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
+}

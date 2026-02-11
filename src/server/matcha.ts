@@ -1,9 +1,11 @@
+import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
-import { prisma } from "@/db";
+import { createPrismaClient } from "@/db";
 
 export const getListings = createServerFn({
   method: "GET",
 }).handler(async () => {
+  const prisma = createPrismaClient(env as { DATABASE_URL: string });
   const listings = await prisma.listing.findMany({
     where: {
       isActive: true,
