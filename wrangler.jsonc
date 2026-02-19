@@ -9,5 +9,18 @@
   },
   "triggers": {
     "crons": ["*/5 * * * *"]
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "SCRAPE_QUEUE",
+        "queue": "scrape-queue"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "scrape-queue"
+      }
+    ]
   }
 }

@@ -4,13 +4,40 @@ import { parse } from "node-html-parser";
 import { createDb } from "@/db";
 import { listings, scrapeJobs, stockHistory } from "@/db/schema";
 
-// Cloudflare Workers scheduled event handler for stock checking
+// Configuration: Number of listings per queue batch
+const BATCH_SIZE = 10;
+
+interface ListingBatch {
+  batchIndex: number;
+  totalBatches: number;
+  scrapeJobId: string;
+  listings: Array<{
+    id: string;
+    url: string;
+    price: string | null;
+    lastStock: boolean | null;
+    storefront: {
+      name: string;
+      url: string;
+    };
+    matcha: {
+      name: string;
+      brand: {
+        name: string;
+      };
+    };
+  }>;
+}
+
+// Cloudflare Workers handler with both scheduled (cron) and queue support
 export default {
   fetch: handler.fetch,
 
+  // Cron handler: Triggered every 5 minutes
+  // Enqueues batches of listings to be processed
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext) {
     console.log("Cron triggered:", _event.cron);
-    console.log("Running matcha stock check at:", new Date().toISOString());
+    console.log("Starting scrape job at:", new Date().toISOString());
 
     const db = createDb(env.DATABASE_URL);
 
@@ -25,7 +52,7 @@ export default {
         })
         .returning();
 
-      // Get all active listings to check
+      // Get all active listings
       const activeListings = await db.query.listings.findMany({
         where: eq(listings.isActive, true),
         with: {
@@ -34,21 +61,47 @@ export default {
         },
       });
 
+      console.log(`Enqueuing ${activeListings.length} listings in batches of ${BATCH_SIZE}`);
+
+      // Split listings into batches
+      const batches: ListingBatch[] = [];
+      for (let i = 0; i < activeListings.length; i += BATCH_SIZE) {
+        batches.push({
+          batchIndex: Math.floor(i / BATCH_SIZE),
+          totalBatches: Math.ceil(activeListings.length / BATCH_SIZE),
+          scrapeJobId: scrapeJob.id,
+          listings: activeListings.slice(i, i + BATCH_SIZE),
+        });
+      }
+
+      // Send all batches to the queue
+      // Each batch will be processed by a separate queue invocation
+      const messages = batches.map((batch) => ({ body: batch }));
+      await env.SCRAPE_QUEUE.sendBatch(messages);
+
+      console.log(`Enqueued ${batches.length} batches for processing`);
+    } catch (error) {
+      console.error("Failed to enqueue scrape batches:", error);
+      throw error;
+    }
+  },
+
+  // Queue handler: Processes each batch of listings
+  // Each invocation has its own 50-subrequest limit
+  async queue(batch: MessageBatch<ListingBatch>, env: Env, _ctx: ExecutionContext) {
+    const db = createDb(env.DATABASE_URL);
+
+    for (const message of batch.messages) {
+      const { batchIndex, totalBatches, scrapeJobId, listings: batchListings } = message.body;
+
+      console.log(`Processing batch ${batchIndex + 1}/${totalBatches} with ${batchListings.length} listings`);
+
       let listingsChecked = 0;
       let listingsChanged = 0;
       const errors: string[] = [];
 
-      // Check stock for each listing
-      // Process sequentially with delays to avoid Cloudflare subrequest limits (max 50)
-      for (let i = 0; i < activeListings.length; i++) {
-        const listing = activeListings[i];
-
-        // Add delay between requests (except for first one)
-        // 200ms delay = 5 requests per second, keeps us well under limits
-        if (i > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-        }
-
+      // Process each listing in the batch
+      for (const listing of batchListings) {
         try {
           listingsChecked++;
           const inStock = await checkStock(listing);
@@ -82,8 +135,9 @@ export default {
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : "Unknown error";
           errors.push(`Listing ${listing.id}: ${errorMsg}`);
+          console.error(`Error checking listing ${listing.id}:`, errorMsg);
 
-          // Record error in stock history
+          // Record error in stock history (preserve lastStock in listings table)
           await db.insert(stockHistory).values({
             id: crypto.randomUUID(),
             listingId: listing.id,
@@ -93,22 +147,33 @@ export default {
         }
       }
 
-      // Update scrape job with results
-      await db
-        .update(scrapeJobs)
-        .set({
-          completedAt: new Date(),
-          listingsChecked: String(listingsChecked),
-          listingsChanged: String(listingsChanged),
-          errors,
-          success: errors.length === 0,
-        })
-        .where(eq(scrapeJobs.id, scrapeJob.id));
+      // Update scrape job with batch results
+      // Use a simple increment approach by reading current values first
+      const [currentJob] = await db.select().from(scrapeJobs).where(eq(scrapeJobs.id, scrapeJobId));
 
-      console.log(`Scrape completed: ${listingsChecked} checked, ${listingsChanged} changed`);
-    } catch (error) {
-      console.error("Scrape job failed:", error);
-      throw error;
+      if (currentJob) {
+        const currentChecked = parseInt(currentJob.listingsChecked || "0", 10);
+        const currentChanged = parseInt(currentJob.listingsChanged || "0", 10);
+        const currentErrors = currentJob.errors || [];
+
+        await db
+          .update(scrapeJobs)
+          .set({
+            completedAt: new Date(),
+            listingsChecked: String(currentChecked + listingsChecked),
+            listingsChanged: String(currentChanged + listingsChanged),
+            errors: [...currentErrors, ...errors],
+            success: errors.length === 0 && currentErrors.length === 0,
+          })
+          .where(eq(scrapeJobs.id, scrapeJobId));
+      }
+
+      console.log(
+        `Batch ${batchIndex + 1}/${totalBatches} completed: ${listingsChecked} checked, ${listingsChanged} changed`,
+      );
+
+      // Acknowledge the message as processed
+      message.ack();
     }
   },
 };
@@ -154,7 +219,7 @@ async function checkStock(listing: Listing): Promise<boolean> {
     "out of stock",
     "sold out",
     "unavailable",
-    'availability": "https://schema.org/OutOfStock"',
+    '"availability":"https://schema.org/OutOfStock"',
     'data-availability="out of stock"',
   ];
 
@@ -163,35 +228,16 @@ async function checkStock(listing: Listing): Promise<boolean> {
 }
 
 function parseSazenStock(html: string): boolean {
-  // Based on old/index.ts logic:
-  // const outOfStockText = $('p strong.red').text().trim();
-  // const inStockForm = $('form#basket-add');
-  // return !outOfStockText.includes('This product is unavailable') && inStockForm.length > 0;
-
   const root = parse(html);
-
-  // Check for out of stock text in <p><strong class="red">
   const outOfStockText = root.querySelector("p strong.red")?.text?.trim() || "";
-
-  // Check for add to cart form
   const inStockForm = root.querySelector("form#basket-add");
-
   return !outOfStockText.includes("This product is unavailable") && !!inStockForm;
 }
 
 function parseIppodoStock(html: string): boolean {
-  // Based on old/index.ts logic:
-  // Look for any button inside .product-form__buttons without style="display: none"
-  // const visibleAddToCartButton = $('.product-form__buttons button').filter((_, el) => {
-  //   const style = $(el).attr('style') || '';
-  //   return !style.includes('display: none');
-  // });
-  // return visibleAddToCartButton.length > 0;
-
   const root = parse(html);
   const buttons = root.querySelectorAll(".product-form__buttons button");
 
-  // Check if any button is visible (not display: none)
   for (const button of buttons) {
     const style = button.getAttribute("style") || "";
     if (!style.toLowerCase().includes("display: none")) {
@@ -203,33 +249,23 @@ function parseIppodoStock(html: string): boolean {
 }
 
 function parseNakamuraStock(html: string): boolean {
-  // Based on old/index.ts logic:
-  // const buttonText = $('div.product-form__buttons button span').text().trim();
-  // return buttonText === 'Add to cart';
-
   const root = parse(html);
   const buttonText = root.querySelector("div.product-form__buttons button span")?.text?.trim() || "";
-
   return buttonText === "Add to cart";
 }
 
 function parseShopifyStock(html: string): boolean {
-  // Shopify stores - check for visible add to cart button
   const root = parse(html);
-
-  // Look for add to cart buttons
   const buttons = root.querySelectorAll(
     'button[name="add"], button[type="submit"], button[class*="add-to-cart"], button[class*="AddToCart"]',
   );
 
   for (const button of buttons) {
-    // Check if button is hidden
     const style = button.getAttribute("style") || "";
     if (style.toLowerCase().includes("display: none")) {
       continue;
     }
 
-    // Check button text content
     const buttonText = button.text?.toLowerCase().trim() || "";
     if (buttonText.includes("sold out") || buttonText.includes("out of stock") || buttonText.includes("unavailable")) {
       continue;
@@ -238,39 +274,9 @@ function parseShopifyStock(html: string): boolean {
     return true;
   }
 
-  // Check for schema.org out of stock
   if (html.includes('"availability":"https://schema.org/OutOfStock"')) {
     return false;
   }
 
   return true;
 }
-
-// async function sendNotification(listing: ListingWithDetails, env: Env): Promise<void> {
-//   const telegramToken = env.TELEGRAM_BOT_TOKEN;
-//   const chatId = env.TELEGRAM_CHAT_ID;
-
-//   if (!telegramToken || !chatId) {
-//     console.warn("Telegram credentials not configured");
-//     return;
-//   }
-
-//   const timestamp = new Date().toLocaleString("en-GB", {
-//     dateStyle: "full",
-//     timeStyle: "long",
-//     timeZone: "Asia/Singapore",
-//   });
-
-//   const message =
-//     `<b>${timestamp}</b>\n\n` +
-//     `<b><u>${listing.storefront.name}</u></b> stock update:\n` +
-//     `<a href="${listing.url}">${listing.matcha.brand.name} - ${listing.matcha.name}</a>`;
-
-//   const encodedMessage = encodeURIComponent(message);
-//   const url = `https://api.telegram.org/bot${telegramToken}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
-
-//   const response = await fetch(url);
-//   if (!response.ok) {
-//     throw new Error(`Failed to send Telegram notification: ${response.status}`);
-//   }
-// }
