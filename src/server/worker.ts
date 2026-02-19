@@ -1,5 +1,6 @@
 import handler from "@tanstack/react-start/server-entry";
 import { eq } from "drizzle-orm";
+import { parse } from "node-html-parser";
 import { createDb } from "@/db";
 import { listings, scrapeJobs, stockHistory } from "@/db/schema";
 
@@ -38,7 +39,16 @@ export default {
       const errors: string[] = [];
 
       // Check stock for each listing
-      for (const listing of activeListings) {
+      // Process sequentially with delays to avoid Cloudflare subrequest limits (max 50)
+      for (let i = 0; i < activeListings.length; i++) {
+        const listing = activeListings[i];
+
+        // Add delay between requests (except for first one)
+        // 200ms delay = 5 requests per second, keeps us well under limits
+        if (i > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+
         try {
           listingsChecked++;
           const inStock = await checkStock(listing);
@@ -158,10 +168,15 @@ function parseSazenStock(html: string): boolean {
   // const inStockForm = $('form#basket-add');
   // return !outOfStockText.includes('This product is unavailable') && inStockForm.length > 0;
 
-  const hasOutOfStockText = html.includes("This product is unavailable");
-  const hasAddToCartForm = html.includes('id="basket-add"');
+  const root = parse(html);
 
-  return !hasOutOfStockText && hasAddToCartForm;
+  // Check for out of stock text in <p><strong class="red">
+  const outOfStockText = root.querySelector("p strong.red")?.text?.trim() || "";
+
+  // Check for add to cart form
+  const inStockForm = root.querySelector("form#basket-add");
+
+  return !outOfStockText.includes("This product is unavailable") && !!inStockForm;
 }
 
 function parseIppodoStock(html: string): boolean {
@@ -173,30 +188,18 @@ function parseIppodoStock(html: string): boolean {
   // });
   // return visibleAddToCartButton.length > 0;
 
-  // Check for product-form__buttons section
-  const formMatch = html.match(/<div[^>]*class="[^"]*product-form__buttons[^"]*"[^>]*>(.*?)<\/div>/is);
+  const root = parse(html);
+  const buttons = root.querySelectorAll(".product-form__buttons button");
 
-  if (formMatch) {
-    const formSection = formMatch[1];
-    // Check for visible button (not display: none)
-    const buttonMatch = formSection.match(/<button[^>]*>(.*?)<\/button>/is);
-
-    if (buttonMatch) {
-      const buttonTag = buttonMatch[0];
-      // Check if button is hidden
-      if (buttonTag.includes('style="display: none"')) {
-        return false;
-      }
+  // Check if any button is visible (not display: none)
+  for (const button of buttons) {
+    const style = button.getAttribute("style") || "";
+    if (!style.toLowerCase().includes("display: none")) {
       return true;
     }
   }
 
-  // Fallback: check for out of stock text
-  if (html.toLowerCase().includes("sold out")) {
-    return false;
-  }
-
-  return true;
+  return false;
 }
 
 function parseNakamuraStock(html: string): boolean {
@@ -204,40 +207,32 @@ function parseNakamuraStock(html: string): boolean {
   // const buttonText = $('div.product-form__buttons button span').text().trim();
   // return buttonText === 'Add to cart';
 
-  const formMatch = html.match(/<div[^>]*class="[^"]*product-form__buttons[^"]*"[^>]*>(.*?)<\/div>/is);
+  const root = parse(html);
+  const buttonText = root.querySelector("div.product-form__buttons button span")?.text?.trim() || "";
 
-  if (formMatch) {
-    const formSection = formMatch[1];
-    // Extract button text
-    const buttonTextMatch = formSection.match(
-      /<button[^>]*>(?:\s*<span[^>]*>)?\s*(.*?)\s*(?:<\/span>\s*)?<\/button>/is,
-    );
-
-    if (buttonTextMatch) {
-      const buttonText = buttonTextMatch[1].trim().toLowerCase();
-      return buttonText === "add to cart";
-    }
-  }
-
-  return false;
+  return buttonText === "Add to cart";
 }
 
 function parseShopifyStock(html: string): boolean {
   // Shopify stores - check for visible add to cart button
-  const buttonMatch = html.match(/<button[^>]*(?:add[- ]?to[- ]?cart|checkout)[^>]*>([^<]*)<\/button>/i);
+  const root = parse(html);
 
-  if (buttonMatch) {
-    const buttonHtml = buttonMatch[0].toLowerCase();
-    const buttonText = buttonMatch[1].toLowerCase();
+  // Look for add to cart buttons
+  const buttons = root.querySelectorAll(
+    'button[name="add"], button[type="submit"], button[class*="add-to-cart"], button[class*="AddToCart"]',
+  );
 
-    // Check if button is hidden via style attribute
-    if (buttonHtml.includes('style="display: none"')) {
-      return false;
+  for (const button of buttons) {
+    // Check if button is hidden
+    const style = button.getAttribute("style") || "";
+    if (style.toLowerCase().includes("display: none")) {
+      continue;
     }
 
-    // Check button text
+    // Check button text content
+    const buttonText = button.text?.toLowerCase().trim() || "";
     if (buttonText.includes("sold out") || buttonText.includes("out of stock") || buttonText.includes("unavailable")) {
-      return false;
+      continue;
     }
 
     return true;
@@ -249,15 +244,6 @@ function parseShopifyStock(html: string): boolean {
   }
 
   return true;
-}
-
-interface ListingWithDetails extends Listing {
-  matcha: {
-    name: string;
-    brand: {
-      name: string;
-    };
-  };
 }
 
 // async function sendNotification(listing: ListingWithDetails, env: Env): Promise<void> {
