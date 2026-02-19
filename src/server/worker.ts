@@ -46,7 +46,7 @@ export default {
         // Add delay between requests (except for first one)
         // 200ms delay = 5 requests per second, keeps us well under limits
         if (i > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 250));
         }
 
         try {
