@@ -8,7 +8,7 @@
     "enabled": true
   },
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["*/30 0-12 * * *"]
   },
   "queues": {
     "producers": [
@@ -19,7 +19,8 @@
     ],
     "consumers": [
       {
-        "queue": "scrape-queue"
+        "queue": "scrape-queue",
+        "max_batch_size": 5
       }
     ]
   }
