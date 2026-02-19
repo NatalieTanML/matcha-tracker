@@ -5,11 +5,13 @@ import * as schema from "./schema";
 export { schema };
 
 export function createDb(databaseUrl: string) {
-  const client = postgres(databaseUrl, { prepare: false });
+  const client = postgres(databaseUrl, {
+    prepare: false, // Required for Supabase pooler and serverless environments
+    max: 10,
+  });
   return drizzle(client, { schema });
 }
 
-/** For scripts (seed, etc.) that read DATABASE_URL from process.env */
 export function getDb() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {

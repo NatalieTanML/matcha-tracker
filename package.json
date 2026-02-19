@@ -5,14 +5,14 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "pnpm run build && vite preview",
     "test": "vitest run",
     "deploy": "pnpm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "post-cta-init": "npx create-db@latest --user-agent tanstack/tsrouter",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate",
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+    "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "dotenv -e .env.local -- tsx src/db/seed.ts",
     "format": "biome format",
@@ -20,6 +20,7 @@
     "check": "biome check"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.97.0",
     "@tailwindcss/vite": "^4.0.6",
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-query": "^5.66.5",
@@ -53,6 +54,7 @@
     "dotenv-cli": "^10.0.0",
     "drizzle-kit": "^0.31.9",
     "jsdom": "^27.0.0",
+    "supabase": "^2.76.11",
     "tsx": "^4.20.6",
     "typescript": "^5.7.2",
     "vite": "^7.1.7",

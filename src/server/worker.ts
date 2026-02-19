@@ -7,8 +7,8 @@ import { listings, scrapeJobs, stockHistory } from "@/db/schema";
 export default {
   fetch: handler.fetch,
 
-  async scheduled(event: { cron: string }, env: Env, _ctx: unknown) {
-    console.log("Cron triggered:", event.cron);
+  async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext) {
+    console.log("Cron triggered:", _event.cron);
     console.log("Running matcha stock check at:", new Date().toISOString());
 
     const db = createDb(env.DATABASE_URL);
