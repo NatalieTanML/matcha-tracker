@@ -20,11 +20,7 @@ export default {
             "User-Agent": "matcha-tracker",
           },
           body: JSON.stringify({
-            event_type: "scrape-matcha",
-            client_payload: {
-              triggered_at: new Date().toISOString(),
-              cron_schedule: _event.cron,
-            },
+            ref: "main",
           }),
         },
       );
