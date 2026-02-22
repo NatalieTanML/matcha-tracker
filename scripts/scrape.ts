@@ -151,7 +151,7 @@ async function main() {
   if (errors.length > 0) {
     console.log("\n⚠️ Errors encountered:");
     errors.forEach((e) => console.log(`  - ${e}`));
-    process.exit(1);
+    process.exit(0);
   }
 }
 
