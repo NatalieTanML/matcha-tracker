@@ -6,8 +6,9 @@ declare namespace Cloudflare {
 		mainModule: typeof import("./src/server/worker");
 	}
 	interface Env {
-		SCRAPE_QUEUE: Queue;
 		DATABASE_URL: string;
+		GITHUB_TOKEN: string;
+		GITHUB_REPO: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

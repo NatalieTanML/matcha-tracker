@@ -8,20 +8,6 @@
     "enabled": true
   },
   "triggers": {
-    "crons": ["*/30 0-12 * * *"]
-  },
-  "queues": {
-    "producers": [
-      {
-        "binding": "SCRAPE_QUEUE",
-        "queue": "scrape-queue"
-      }
-    ],
-    "consumers": [
-      {
-        "queue": "scrape-queue",
-        "max_batch_size": 5
-      }
-    ]
+    "crons": ["*/5 0-14 * * *"]
   }
 }
