@@ -8,24 +8,26 @@ export default {
     console.log("Dispatching GitHub Actions workflow at:", new Date().toISOString());
 
     try {
-      // Trigger GitHub Actions workflow via repository_dispatch
-      // This requires a GitHub Personal Access Token with repo scope
-      const response = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/dispatches`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          event_type: "scrape-matcha",
-          client_payload: {
-            triggered_at: new Date().toISOString(),
-            cron_schedule: _event.cron,
+      const response = await fetch(
+        `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/scrape.yml/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+            "User-Agent": "matcha-tracker",
           },
-        }),
-      });
+          body: JSON.stringify({
+            event_type: "scrape-matcha",
+            client_payload: {
+              triggered_at: new Date().toISOString(),
+              cron_schedule: _event.cron,
+            },
+          }),
+        },
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
