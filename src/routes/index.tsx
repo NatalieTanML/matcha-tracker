@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -20,6 +20,13 @@ function App() {
   const [sortBy, setSortBy] = useState<SortOption>("lastChecked");
   const [selectedStorefront, setSelectedStorefront] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const storefronts = useMemo(() => {
     const unique = new Set(listings.map((l) => l.storefront.name));
@@ -55,9 +62,9 @@ function App() {
 
   const formatLastChecked = (date: Date | null | undefined) => {
     if (!date) return "Never checked";
+    if (now === null) return new Date(date).toISOString().slice(0, 10);
     const d = new Date(date);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
+    const diffMs = now - d.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
