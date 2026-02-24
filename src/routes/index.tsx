@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getListings } from "@/server/matcha";
 
@@ -79,12 +79,12 @@ function App() {
     <div className="container mx-auto p-4">
       <div className="mb-6 p-4 bg-muted/50 rounded-lg space-y-4 border">
         <div className="flex flex-wrap gap-4 items-end">
-          <div className="space-y-1">
-            <Field className="text-sm text-muted-foreground w-64">
-              <FieldLabel>Sort by</FieldLabel>
+          <FieldGroup className="space-y-1 w-full md:w-sm">
+            <Field className="text-sm text-muted-foreground">
+              <FieldLabel htmlFor="sortBy">Sort by</FieldLabel>
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
+                <SelectTrigger>
+                  <SelectValue id="sortBy" />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   <SelectItem value="lastChecked">Last Updated</SelectItem>
@@ -92,14 +92,14 @@ function App() {
                 </SelectContent>
               </Select>
             </Field>
-          </div>
+          </FieldGroup>
 
-          <div className="space-y-1">
-            <Field className="text-sm text-muted-foreground w-64">
-              <FieldLabel>Storefront</FieldLabel>
+          <FieldGroup className="space-y-1  w-full md:w-sm">
+            <Field className="text-sm text-muted-foreground">
+              <FieldLabel htmlFor="storefront">Storefront</FieldLabel>
               <Select value={selectedStorefront} onValueChange={setSelectedStorefront}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
+                <SelectTrigger>
+                  <SelectValue id="storefront" />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   <SelectItem value="all">All Storefronts</SelectItem>
@@ -111,14 +111,14 @@ function App() {
                 </SelectContent>
               </Select>
             </Field>
-          </div>
+          </FieldGroup>
 
-          <div className="space-y-1">
-            <Field className="text-sm text-muted-foreground w-64">
-              <FieldLabel>Stock Status</FieldLabel>
+          <FieldGroup className="space-y-1 w-full md:w-sm">
+            <Field className="text-sm text-muted-foreground">
+              <FieldLabel htmlFor="stockStatus">Stock Status</FieldLabel>
               <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue id="stockStatus" />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   <SelectItem value="all">All</SelectItem>
@@ -127,7 +127,7 @@ function App() {
                 </SelectContent>
               </Select>
             </Field>
-          </div>
+          </FieldGroup>
         </div>
 
         <div className="text-xs text-muted-foreground">
@@ -167,12 +167,7 @@ function App() {
                 )}
               </div>
               <div className="p-4 pt-2 mt-auto flex items-center justify-between">
-                <Badge
-                  variant={listing.lastStock ? "outline" : "destructive"}
-                  className={
-                    listing.lastStock ? "bg-primary-foreground text-primary border-primary/30" : "border-destructive/30"
-                  }
-                >
+                <Badge variant={listing.lastStock ? "success" : "destructive"}>
                   {listing.lastStock ? "In Stock" : "Out of Stock"}
                 </Badge>
                 {listing.price && <span className="text-sm text-muted-foreground">{listing.price}</span>}
