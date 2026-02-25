@@ -4,11 +4,22 @@ import { createDb } from "@/db";
 import { telegramLinkCodes, users } from "@/db/schema";
 
 async function sendTelegramMessage(botToken: string, chatId: string, text: string) {
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
-  });
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Telegram API] Failed to send message: ${response.status} ${errorText}`);
+    } else {
+      console.log(`[Telegram API] Message sent to ${chatId}`);
+    }
+  } catch (err) {
+    console.error("[Telegram API] Error sending message:", err);
+  }
 }
 
 interface TelegramUpdate {
@@ -18,30 +29,39 @@ interface TelegramUpdate {
   };
 }
 
-async function handleTelegramWebhook(request: Request, _env: Env, _ctx: ExecutionContext) {
+async function handleTelegramWebhook(request: Request, _env: Env, _ctx: ExecutionContext): Promise<void> {
   const botToken = _env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
-    console.error("TELEGRAM_BOT_TOKEN not set");
+    console.error("[Telegram Webhook] TELEGRAM_BOT_TOKEN not set");
     return;
   }
+
+  console.log("[Telegram Webhook] Received request");
 
   let update: TelegramUpdate;
   try {
     update = (await request.json()) as TelegramUpdate;
-  } catch {
-    console.error("Failed to parse Telegram update");
+    console.log("[Telegram Webhook] Update received:", JSON.stringify(update, null, 2));
+  } catch (err) {
+    console.error("[Telegram Webhook] Failed to parse Telegram update:", err);
     return;
   }
 
   const message = update.message;
-  if (!message?.text) return;
+  if (!message?.text) {
+    console.log("[Telegram Webhook] No message text found");
+    return;
+  }
 
   const chatId = String(message.chat.id);
   const text = message.text.trim();
 
+  console.log(`[Telegram Webhook] Message from ${chatId}: ${text}`);
+
   // Command: /link <CODE>
   const linkMatch = text.match(/^\/link\s+([A-Z0-9]{8})$/i);
   if (!linkMatch) {
+    console.log("[Telegram Webhook] No valid /link command found");
     await sendTelegramMessage(
       botToken,
       chatId,
@@ -51,32 +71,44 @@ async function handleTelegramWebhook(request: Request, _env: Env, _ctx: Executio
   }
 
   const code = linkMatch[1].toUpperCase();
-  const db = createDb(_env.DATABASE_URL);
+  console.log(`[Telegram Webhook] Processing code: ${code}`);
 
-  const linkCode = await db.query.telegramLinkCodes.findFirst({
-    where: and(eq(telegramLinkCodes.code, code), gt(telegramLinkCodes.expiresAt, new Date())),
-  });
+  try {
+    const db = createDb(_env.DATABASE_URL);
 
-  if (!linkCode) {
+    const linkCode = await db.query.telegramLinkCodes.findFirst({
+      where: and(eq(telegramLinkCodes.code, code), gt(telegramLinkCodes.expiresAt, new Date())),
+    });
+
+    console.log(`[Telegram Webhook] Link code lookup result:`, linkCode);
+
+    if (!linkCode) {
+      console.log(`[Telegram Webhook] Code ${code} not found or expired`);
+      await sendTelegramMessage(
+        botToken,
+        chatId,
+        "That code is invalid or expired. Please generate a new one from your profile page.",
+      );
+      return;
+    }
+
+    // Store the chat_id on the user
+    console.log(`[Telegram Webhook] Linking user ${linkCode.userId} with chat ${chatId}`);
+    await db.update(users).set({ telegramChatId: chatId }).where(eq(users.id, linkCode.userId));
+
+    // Delete the used code (one-time use)
+    await db.delete(telegramLinkCodes).where(eq(telegramLinkCodes.code, code));
+
     await sendTelegramMessage(
       botToken,
       chatId,
-      "That code is invalid or expired. Please generate a new one from your profile page.",
+      "Linked! You'll now receive stock alerts for your tracked matcha listings.",
     );
-    return;
+    console.log(`[Telegram Webhook] Successfully linked user ${linkCode.userId}`);
+  } catch (err) {
+    console.error("[Telegram Webhook] Error processing link:", err);
+    await sendTelegramMessage(botToken, chatId, "Sorry, something went wrong. Please try again later.");
   }
-
-  // Store the chat_id on the user
-  await db.update(users).set({ telegramChatId: chatId }).where(eq(users.id, linkCode.userId));
-
-  // Delete the used code (one-time use)
-  await db.delete(telegramLinkCodes).where(eq(telegramLinkCodes.code, code));
-
-  await sendTelegramMessage(
-    botToken,
-    chatId,
-    "Linked! You'll now receive stock alerts for your tracked matcha listings.",
-  );
 }
 
 export default {

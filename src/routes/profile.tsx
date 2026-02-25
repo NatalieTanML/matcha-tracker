@@ -1,4 +1,4 @@
-import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSuspenseQuery(sessionQueryOptions);
   const { data: telegramStatus } = useSuspenseQuery(telegramStatusQueryOptions);
 
@@ -51,6 +52,8 @@ function ProfilePage() {
 
   async function handleSignOut() {
     await authClient.signOut();
+    // Invalidate session query to trigger re-fetch
+    await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
     await router.invalidate();
     router.navigate({ to: "/" });
   }

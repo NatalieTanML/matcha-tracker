@@ -1,9 +1,11 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { sessionQueryOptions } from "@/lib/query-options";
 
 export const Route = createFileRoute("/register")({
   component: RegisterPage,
@@ -11,6 +13,7 @@ export const Route = createFileRoute("/register")({
 
 function RegisterPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +37,8 @@ function RegisterPage() {
       return;
     }
 
+    // Invalidate session query to trigger re-fetch
+    await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
     await router.invalidate();
     router.navigate({ to: "/" });
   }
