@@ -1,10 +1,71 @@
 import { relations } from "drizzle-orm";
-import { boolean, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-// Enums
-export const roleEnum = pgEnum("role", ["USER", "ADMIN"]);
+// ============================================================
+// Better Auth core tables
+// ============================================================
 
-// Tables
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  role: text("role").notNull().default("user"), // "user" | "admin" — managed by better-auth admin plugin
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires", { mode: "date" }),
+  // Custom fields
+  telegramChatId: text("telegram_chat_id"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull(),
+});
+
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  token: text("token").notNull().unique(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  impersonatedBy: text("impersonated_by"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull(),
+});
+
+export const accounts = pgTable("accounts", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", { mode: "date" }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { mode: "date" }),
+  scope: text("scope"),
+  password: text("password"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull(),
+});
+
+export const verifications = pgTable("verifications", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }),
+  updatedAt: timestamp("updated_at", { mode: "date" }),
+});
+
+// ============================================================
+// App tables
+// ============================================================
+
 export const storefronts = pgTable("storefronts", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
@@ -73,15 +134,6 @@ export const stockHistory = pgTable("stock_history", {
   error: text("error"),
 });
 
-export const users = pgTable("users", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  telegramChatId: text("telegram_chat_id"),
-  role: roleEnum("role").default("USER").notNull(),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
-
 export const userNotificationPreferences = pgTable("user_notification_preferences", {
   id: text("id").primaryKey(),
   userId: text("user_id")
@@ -103,7 +155,35 @@ export const scrapeJobs = pgTable("scrape_jobs", {
   success: boolean("success").default(false).notNull(),
 });
 
+// One-time codes for linking Telegram accounts
+export const telegramLinkCodes = pgTable("telegram_link_codes", {
+  code: text("code").primaryKey(), // 8-char alphanumeric, shown to user
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ============================================================
 // Relations
+// ============================================================
+
+export const usersRelations = relations(users, ({ many }) => ({
+  sessions: many(sessions),
+  accounts: many(accounts),
+  notificationPreferences: many(userNotificationPreferences),
+  telegramLinkCodes: many(telegramLinkCodes),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, { fields: [accounts.userId], references: [users.id] }),
+}));
+
 export const storefrontsRelations = relations(storefronts, ({ many }) => ({
   listings: many(listings),
   brands: many(storefrontsBrands),
@@ -126,55 +206,43 @@ export const storefrontsBrandsRelations = relations(storefrontsBrands, ({ one })
 }));
 
 export const matchasRelations = relations(matchas, ({ one, many }) => ({
-  brand: one(brands, {
-    fields: [matchas.brandId],
-    references: [brands.id],
-  }),
+  brand: one(brands, { fields: [matchas.brandId], references: [brands.id] }),
   listings: many(listings),
 }));
 
 export const listingsRelations = relations(listings, ({ one, many }) => ({
-  matcha: one(matchas, {
-    fields: [listings.matchaId],
-    references: [matchas.id],
-  }),
-  storefront: one(storefronts, {
-    fields: [listings.storefrontId],
-    references: [storefronts.id],
-  }),
+  matcha: one(matchas, { fields: [listings.matchaId], references: [matchas.id] }),
+  storefront: one(storefronts, { fields: [listings.storefrontId], references: [storefronts.id] }),
   stockHistory: many(stockHistory),
   userPreferences: many(userNotificationPreferences),
 }));
 
 export const stockHistoryRelations = relations(stockHistory, ({ one }) => ({
-  listing: one(listings, {
-    fields: [stockHistory.listingId],
-    references: [listings.id],
-  }),
-}));
-
-export const usersRelations = relations(users, ({ many }) => ({
-  notificationPreferences: many(userNotificationPreferences),
+  listing: one(listings, { fields: [stockHistory.listingId], references: [listings.id] }),
 }));
 
 export const userNotificationPreferencesRelations = relations(userNotificationPreferences, ({ one }) => ({
-  user: one(users, {
-    fields: [userNotificationPreferences.userId],
-    references: [users.id],
-  }),
-  listing: one(listings, {
-    fields: [userNotificationPreferences.listingId],
-    references: [listings.id],
-  }),
+  user: one(users, { fields: [userNotificationPreferences.userId], references: [users.id] }),
+  listing: one(listings, { fields: [userNotificationPreferences.listingId], references: [listings.id] }),
 }));
 
+export const telegramLinkCodesRelations = relations(telegramLinkCodes, ({ one }) => ({
+  user: one(users, { fields: [telegramLinkCodes.userId], references: [users.id] }),
+}));
+
+// ============================================================
 // Types
+// ============================================================
+
+export type User = typeof users.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
+export type Account = typeof accounts.$inferSelect;
 export type Storefront = typeof storefronts.$inferSelect;
 export type Brand = typeof brands.$inferSelect;
 export type Matcha = typeof matchas.$inferSelect;
 export type Listing = typeof listings.$inferSelect;
 export type StockHistory = typeof stockHistory.$inferSelect;
-export type User = typeof users.$inferSelect;
 export type UserNotificationPreference = typeof userNotificationPreferences.$inferSelect;
 export type ScrapeJob = typeof scrapeJobs.$inferSelect;
 export type StorefrontsBrands = typeof storefrontsBrands.$inferSelect;
+export type TelegramLinkCode = typeof telegramLinkCodes.$inferSelect;

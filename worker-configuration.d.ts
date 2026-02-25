@@ -9,6 +9,10 @@ declare namespace Cloudflare {
 		DATABASE_URL: string;
 		GITHUB_TOKEN: string;
 		GITHUB_REPO: string;
+		BETTER_AUTH_SECRET: string;
+		BETTER_AUTH_URL: string;
+		ADMIN_USER_ID?: string;
+		TELEGRAM_BOT_TOKEN?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

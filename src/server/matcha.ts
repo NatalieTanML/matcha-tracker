@@ -1,8 +1,10 @@
 import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
-import { desc, eq } from "drizzle-orm";
+import { getRequestHeaders } from "@tanstack/react-start/server";
+import { and, desc, eq } from "drizzle-orm";
 import { createDb } from "@/db";
-import { listings } from "@/db/schema";
+import { listings, userNotificationPreferences } from "@/db/schema";
+import { createAuth } from "@/lib/auth";
 
 export const getListings = createServerFn({
   method: "GET",
@@ -22,3 +24,67 @@ export const getListings = createServerFn({
   });
   return result;
 });
+
+export const getMyTrackedListings = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const headers = getRequestHeaders();
+  const auth = createAuth(env);
+  const session = await auth.api.getSession({ headers });
+
+  if (!session) return [] as string[];
+
+  const db = createDb(env.DATABASE_URL);
+  const prefs = await db.query.userNotificationPreferences.findMany({
+    where: eq(userNotificationPreferences.userId, session.user.id),
+  });
+
+  return prefs.map((p) => p.listingId);
+});
+
+// Validator function for toggleTracking
+const toggleTrackingValidator = (input: unknown): { listingId: string } => {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    !("listingId" in input) ||
+    typeof (input as { listingId: unknown }).listingId !== "string"
+  ) {
+    throw new Error("listingId is required");
+  }
+  return input as { listingId: string };
+};
+
+export const toggleTracking = createServerFn({
+  method: "POST",
+})
+  .inputValidator(toggleTrackingValidator)
+  .handler(async ({ data }) => {
+    const headers = getRequestHeaders();
+    const auth = createAuth(env);
+    const session = await auth.api.getSession({ headers });
+
+    if (!session) throw new Error("Unauthorized");
+
+    const db = createDb(env.DATABASE_URL);
+
+    const existing = await db.query.userNotificationPreferences.findFirst({
+      where: and(
+        eq(userNotificationPreferences.userId, session.user.id),
+        eq(userNotificationPreferences.listingId, data.listingId),
+      ),
+    });
+
+    if (existing) {
+      await db.delete(userNotificationPreferences).where(eq(userNotificationPreferences.id, existing.id));
+      return { tracked: false };
+    }
+
+    await db.insert(userNotificationPreferences).values({
+      id: crypto.randomUUID(),
+      userId: session.user.id,
+      listingId: data.listingId,
+    });
+
+    return { tracked: true };
+  });

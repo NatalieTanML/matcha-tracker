@@ -1,32 +1,85 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getListings } from "@/server/matcha";
+import {
+  listingsQueryOptions,
+  myTrackedListingsQueryOptions,
+  sessionQueryOptions,
+  toggleTrackingMutationOptions,
+} from "@/lib/query-options";
 
 export const Route = createFileRoute("/")({
-  loader: async () => await getListings(),
+  // Prefetch queries but don't block navigation
+  beforeLoad: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.prefetchQuery(listingsQueryOptions),
+      context.queryClient.prefetchQuery(myTrackedListingsQueryOptions),
+    ]);
+  },
   component: App,
+  pendingComponent: () => <div className="container mx-auto p-4">Loading...</div>,
 });
 
 type SortOption = "lastChecked" | "storefront";
 type StockFilter = "all" | "inStock" | "outOfStock";
 
 function App() {
-  const listings = Route.useLoaderData();
+  const { data: listings } = useSuspenseQuery(listingsQueryOptions);
+  const { data: trackedListingIds } = useSuspenseQuery(myTrackedListingsQueryOptions);
+  const { data: session } = useSuspenseQuery(sessionQueryOptions);
+  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set(trackedListingIds));
 
   const [sortBy, setSortBy] = useState<SortOption>("lastChecked");
   const [selectedStorefront, setSelectedStorefront] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [now, setNow] = useState<number | null>(null);
 
+  // Keep local state in sync with server state
+  useEffect(() => {
+    setTrackedIds(new Set(trackedListingIds));
+  }, [trackedListingIds]);
+
   useEffect(() => {
     setNow(Date.now());
     const interval = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  const toggleMutation = useMutation({
+    ...toggleTrackingMutationOptions,
+    onMutate: async (listingId) => {
+      // Optimistic update
+      const isTracked = trackedIds.has(listingId);
+      setTrackedIds((prev) => {
+        const next = new Set(prev);
+        if (isTracked) {
+          next.delete(listingId);
+        } else {
+          next.add(listingId);
+        }
+        return next;
+      });
+      return { isTracked };
+    },
+    onError: (_err, listingId, context) => {
+      // Rollback on error
+      if (context) {
+        setTrackedIds((prev) => {
+          const next = new Set(prev);
+          if (context.isTracked) {
+            next.add(listingId);
+          } else {
+            next.delete(listingId);
+          }
+          return next;
+        });
+      }
+    },
+  });
 
   const storefronts = useMemo(() => {
     const unique = new Set(listings.map((l) => l.storefront.name));
@@ -82,6 +135,11 @@ function App() {
     setSortBy("lastChecked");
   };
 
+  const handleToggleTracking = (listingId: string) => {
+    if (!session) return;
+    toggleMutation.mutate(listingId);
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="mb-6 p-4 bg-muted/50 rounded-lg space-y-4 border">
@@ -101,7 +159,7 @@ function App() {
             </Field>
           </FieldGroup>
 
-          <FieldGroup className="space-y-1  w-full md:w-sm">
+          <FieldGroup className="space-y-1 w-full md:w-sm">
             <Field className="text-sm text-muted-foreground">
               <FieldLabel htmlFor="storefront">Storefront</FieldLabel>
               <Select value={selectedStorefront} onValueChange={setSelectedStorefront}>
@@ -177,7 +235,23 @@ function App() {
                 <Badge variant={listing.lastStock ? "success" : "destructive"}>
                   {listing.lastStock ? "In Stock" : "Out of Stock"}
                 </Badge>
-                {listing.price && <span className="text-sm text-muted-foreground">{listing.price}</span>}
+                <div className="flex items-center gap-2">
+                  {listing.price && <span className="text-sm text-muted-foreground">{listing.price}</span>}
+                  {session ? (
+                    <Button
+                      variant={trackedIds.has(listing.id) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleToggleTracking(listing.id)}
+                      disabled={toggleMutation.isPending}
+                    >
+                      {trackedIds.has(listing.id) ? "🔔" : "🔕"}
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link to="/login">Login to track</Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ))}

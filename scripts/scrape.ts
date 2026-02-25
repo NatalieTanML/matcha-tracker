@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { parse } from "node-html-parser";
 import PQueue from "p-queue";
 import { createDb } from "../src/db";
-import { listings, scrapeJobs, stockHistory } from "../src/db/schema";
+import { listings, scrapeJobs, stockHistory, userNotificationPreferences, users } from "../src/db/schema";
 
 const CONCURRENCY_LIMIT = 5;
 const SAZEN_CONCURRENCY = 3;
@@ -31,6 +31,52 @@ interface ProcessResult {
   error: string | null;
 }
 
+async function sendTelegramMessage(botToken: string, chatId: string, text: string) {
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+    });
+    if (!response.ok) {
+      console.error(`Failed to send Telegram message to ${chatId}: ${response.status}`);
+    }
+  } catch (err) {
+    console.error(`Error sending Telegram message: ${err}`);
+  }
+}
+
+async function notifyUsers(
+  db: ReturnType<typeof createDb>,
+  listing: Listing,
+  inStock: boolean,
+  botToken: string | undefined
+) {
+  if (!botToken) return;
+
+  const watchers = await db
+    .select({
+      userId: userNotificationPreferences.userId,
+      telegramChatId: users.telegramChatId,
+    })
+    .from(userNotificationPreferences)
+    .innerJoin(users, eq(userNotificationPreferences.userId, users.id))
+    .where(eq(userNotificationPreferences.listingId, listing.id));
+
+  const status = inStock ? "🟢 IN STOCK" : "🔴 OUT OF STOCK";
+  const message = `${status}: ${listing.matcha.brand.name} - ${listing.matcha.name}\n${listing.storefront.name}`;
+
+  for (const watcher of watchers) {
+    if (watcher.telegramChatId) {
+      await sendTelegramMessage(botToken, watcher.telegramChatId, message);
+    }
+  }
+
+  if (watchers.length > 0) {
+    console.log(`  📱 Notified ${watchers.length} user(s) about ${listing.matcha.name}`);
+  }
+}
+
 async function main() {
   console.log("🍵 Starting matcha stock scrape at:", new Date().toISOString());
 
@@ -39,9 +85,9 @@ async function main() {
     throw new Error("DATABASE_URL environment variable is required");
   }
 
+  const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
   const db = createDb(databaseUrl);
 
-  // Create a scrape job record
   const [scrapeJob] = await db
     .insert(scrapeJobs)
     .values({
@@ -53,7 +99,6 @@ async function main() {
 
   console.log(`📋 Created scrape job: ${scrapeJob.id}`);
 
-  // Get all active listings
   const activeListings = await db.query.listings.findMany({
     where: eq(listings.isActive, true),
     with: {
@@ -64,7 +109,6 @@ async function main() {
 
   console.log(`🔍 Found ${activeListings.length} active listings to check`);
 
-  // Group listings by storefront name
   const listingsByStorefront = new Map<string, Listing[]>();
 
   for (const listing of activeListings) {
@@ -75,7 +119,6 @@ async function main() {
     listingsByStorefront.get(storefrontName)!.push(listing);
   }
 
-  // Log breakdown
   console.log("\n📊 Storefront breakdown:");
   for (const [name, listings] of listingsByStorefront) {
     console.log(`  - ${name}: ${listings.length} listings`);
@@ -85,7 +128,6 @@ async function main() {
   let listingsChanged = 0;
   const errors: string[] = [];
 
-  // Process all storefronts in parallel
   console.log(`\n🚀 Processing ${listingsByStorefront.size} storefronts in parallel...`);
 
   const storefrontPromises = Array.from(listingsByStorefront.entries()).map(
@@ -98,7 +140,7 @@ async function main() {
       );
 
       const startTime = Date.now();
-      const results = await processWithQueue(storefrontListings, db, concurrency);
+      const results = await processWithQueue(storefrontListings, db, telegramBotToken, concurrency);
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
       const changedCount = results.filter((r) => r.changed).length;
@@ -108,7 +150,6 @@ async function main() {
         `  [${storefrontName}] ✓ Completed in ${duration}s: ${results.length} checked, ${changedCount} changed${errorCount > 0 ? `, ${errorCount} errors` : ""}`
       );
 
-      // Log stock changes for this storefront
       const stockChanges = results.filter((r) => r.changed);
       for (const change of stockChanges) {
         const status = change.inStock ? "✅ IN STOCK" : "❌ Out of stock";
@@ -123,17 +164,14 @@ async function main() {
     }
   );
 
-  // Wait for all storefronts to complete
   const results = await Promise.all(storefrontPromises);
 
-  // Aggregate results
   for (const result of results) {
     listingsChecked += result.checked;
     listingsChanged += result.changed;
     errors.push(...result.errors);
   }
 
-  // Update scrape job with final results
   await db
     .update(scrapeJobs)
     .set({
@@ -158,18 +196,16 @@ async function main() {
 async function processWithQueue(
   storefrontListings: Listing[],
   db: ReturnType<typeof createDb>,
+  botToken: string | undefined,
   concurrency: number
 ): Promise<ProcessResult[]> {
-  // Create queue with specified concurrency
   const queue = new PQueue({ concurrency });
 
-  // Add all listings to the queue
   const promises = storefrontListings.map((listing) =>
     queue.add(async () => {
       try {
         const inStock = await checkStock(listing);
 
-        // Record stock history
         await db.insert(stockHistory).values({
           id: crypto.randomUUID(),
           listingId: listing.id,
@@ -177,13 +213,14 @@ async function processWithQueue(
           price: listing.price,
         });
 
-        // Check if stock status changed
         if (listing.lastStock !== inStock) {
-          // Update listing with new stock status
           await db
             .update(listings)
             .set({ lastStock: inStock, lastChecked: new Date() })
             .where(eq(listings.id, listing.id));
+
+          // Send Telegram notifications
+          await notifyUsers(db, listing, inStock, botToken);
 
           return {
             listing,
@@ -192,7 +229,6 @@ async function processWithQueue(
             error: null,
           };
         } else {
-          // Just update lastChecked
           await db.update(listings).set({ lastChecked: new Date() }).where(eq(listings.id, listing.id));
           return {
             listing,
@@ -203,7 +239,6 @@ async function processWithQueue(
         }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        // Record error in stock history
         await db.insert(stockHistory).values({
           id: crypto.randomUUID(),
           listingId: listing.id,
@@ -220,7 +255,6 @@ async function processWithQueue(
     })
   );
 
-  // Wait for all to complete
   const settledResults = await Promise.allSettled(promises);
 
   return settledResults.map((result, index) => {
@@ -237,7 +271,6 @@ async function processWithQueue(
   });
 }
 
-// Scraping logic
 async function checkStock(listing: Listing): Promise<boolean> {
   const response = await fetch(listing.url, {
     headers: {
@@ -254,7 +287,6 @@ async function checkStock(listing: Listing): Promise<boolean> {
 
   const html = await response.text();
 
-  // Use storefront name to determine parsing strategy
   if (
     listing.storefront.name.toLowerCase().includes("sazen") ||
     listing.url.includes("sazentea.com")
@@ -270,18 +302,15 @@ async function checkStock(listing: Listing): Promise<boolean> {
     listing.url.includes("tokichi")
   ) {
     return parseNakamuraStock(html);
-  } else if (
-    listing.url.includes("horiishichimeien")
-  ) {
-    return parseHoriiStock(html)
+  } else if (listing.url.includes("horiishichimeien")) {
+    return parseHoriiStock(html);
   } else if (
     listing.url.includes("myshopify.com") ||
     listing.url.includes("shopify")
   ) {
     return parseShopifyStock(html);
-  } 
+  }
 
-  // Generic check
   const outOfStockIndicators = [
     "out of stock",
     "sold out",
@@ -323,7 +352,7 @@ function parseNakamuraStock(html: string): boolean {
 
 function parseHoriiStock(html: string): boolean {
   const root = parse(html);
-  const buttonText = root.querySelector("button.product-form__cart-submit span")?.text?.trim() || ""
+  const buttonText = root.querySelector("button.product-form__cart-submit span")?.text?.trim() || "";
   return buttonText === "Add to cart";
 }
 
@@ -354,7 +383,6 @@ function parseShopifyStock(html: string): boolean {
   return true;
 }
 
-// Run the script
 main().catch((error) => {
   console.error("💥 Fatal error:", error);
   process.exit(1);
