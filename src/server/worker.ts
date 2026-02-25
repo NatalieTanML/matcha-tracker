@@ -29,23 +29,14 @@ interface TelegramUpdate {
   };
 }
 
-async function handleTelegramWebhook(request: Request, _env: Env, _ctx: ExecutionContext): Promise<void> {
+async function handleTelegramWebhook(update: TelegramUpdate, _env: Env, _ctx: ExecutionContext): Promise<void> {
   const botToken = _env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
     console.error("[Telegram Webhook] TELEGRAM_BOT_TOKEN not set");
     return;
   }
 
-  console.log("[Telegram Webhook] Received request");
-
-  let update: TelegramUpdate;
-  try {
-    update = (await request.json()) as TelegramUpdate;
-    console.log("[Telegram Webhook] Update received:", JSON.stringify(update, null, 2));
-  } catch (err) {
-    console.error("[Telegram Webhook] Failed to parse Telegram update:", err);
-    return;
-  }
+  console.log("[Telegram Webhook] Update received:", JSON.stringify(update, null, 2));
 
   const message = update.message;
   if (!message?.text) {
@@ -117,7 +108,17 @@ export default {
 
     // Telegram bot webhook — handled before TanStack Start
     if (url.pathname === "/api/telegram/webhook" && request.method === "POST") {
-      ctx.waitUntil(handleTelegramWebhook(request.clone() as Request, _env, ctx));
+      // Read the body immediately before returning response
+      let update: TelegramUpdate;
+      try {
+        update = (await request.json()) as TelegramUpdate;
+      } catch (err) {
+        console.error("[Telegram Webhook] Failed to parse request body:", err);
+        return new Response("OK", { status: 200 });
+      }
+
+      // Process asynchronously after reading body
+      ctx.waitUntil(handleTelegramWebhook(update, _env, ctx));
       return new Response("OK", { status: 200 });
     }
 
