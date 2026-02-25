@@ -123,7 +123,7 @@ function ProfilePage() {
                     <li>
                       Open{" "}
                       <a
-                        href="https://t.me/YourBotUsername"
+                        href="https://t.me/matchadropbot"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline"
