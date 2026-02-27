@@ -9,5 +9,11 @@
   },
   "triggers": {
     "crons": ["*/5 0-14 * * *"]
-  }
+  },
+  "routes": [
+    {
+      "pattern": "matchadrop.fyi",
+      "custom_domain": true
+    }
+  ]
 }
