@@ -8,7 +8,7 @@ interface NavbarProps {
 
 export function Navbar({ session }: NavbarProps) {
   return (
-    <header className="sticky top-0 z-50 bg-background/60 backdrop-blur">
+    <header className="sticky top-0 z-50 bg-background/70 backdrop-blur [&]:[-webkit-backdrop-filter:blur(8px)]">
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 text-lg font-semibold">
           {/* <img src="/logo192.png" alt="matchadrop.fyi icon" className="h-8 w-auto" /> */}

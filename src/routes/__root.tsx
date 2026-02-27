@@ -1,7 +1,7 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRouteWithContext, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { Navbar } from "@/components/navbar";
 import { sessionQueryOptions } from "@/lib/query-options";
@@ -17,6 +17,7 @@ const SITE_NAME = "matchadrop.fyi";
 const DEFAULT_DESCRIPTION = "Get real-time matcha restock notifications. Never miss a matcha restock again.";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
+  notFoundComponent: NotFound,
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -69,5 +70,20 @@ function RootDocument() {
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function NotFound() {
+  return (
+    <main className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] gap-6 px-6 text-center">
+      <p className="text-7xl font-bold text-sprout-300 select-none">404</p>
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold">Page not found</h1>
+        <p className="text-muted-foreground">This page doesn't exist or has been moved.</p>
+      </div>
+      <Link to="/" className="text-sm text-sprout-400 hover:underline">
+        Back to home
+      </Link>
+    </main>
   );
 }

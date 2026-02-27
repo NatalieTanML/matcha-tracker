@@ -3,6 +3,7 @@ import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { authClient } from "@/lib/auth-client";
 import {
   sessionQueryOptions,
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/profile")({
     await context.queryClient.prefetchQuery(telegramStatusQueryOptions);
   },
   component: ProfilePage,
-  pendingComponent: () => <div className="container mx-auto p-4">Loading...</div>,
+  pendingComponent: () => <Spinner className="size-8" />,
 });
 
 function ProfilePage() {
