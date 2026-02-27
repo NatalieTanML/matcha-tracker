@@ -1,11 +1,11 @@
-import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   listingsQueryOptions,
   myTrackedListingsQueryOptions,
@@ -14,34 +14,75 @@ import {
 } from "@/lib/query-options";
 
 export const Route = createFileRoute("/")({
-  // Prefetch queries but don't block navigation
-  beforeLoad: async ({ context }) => {
-    await Promise.all([
-      context.queryClient.prefetchQuery(listingsQueryOptions),
-      context.queryClient.prefetchQuery(myTrackedListingsQueryOptions),
-    ]);
-  },
   component: App,
-  pendingComponent: () => <Spinner className="size8" />,
 });
 
 type SortOption = "lastChecked" | "storefront";
 type StockFilter = "all" | "inStock" | "outOfStock";
 
+function ListingCardSkeleton() {
+  return (
+    <div className="border rounded-lg flex flex-col bg-card/80">
+      <div className="p-4 pb-2">
+        <Skeleton className="aspect-square w-full rounded-md" />
+      </div>
+      <div className="p-4 space-y-2">
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-1/3" />
+        <Skeleton className="h-12 w-full mt-2" />
+      </div>
+      <div className="p-4 pt-2 mt-auto flex items-center justify-between">
+        <Skeleton className="h-6 w-20" />
+        <Skeleton className="h-8 w-16" />
+      </div>
+    </div>
+  );
+}
+
+function FilterSkeleton() {
+  return (
+    <div className="mb-6 p-4 bg-muted rounded-lg space-y-4 border">
+      <div className="flex flex-wrap gap-4 items-end">
+        <FieldGroup className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <Field>
+            <Skeleton className="h-5 w-48 bg-card/80" />
+            <Skeleton className="h-8 w-full rounded-md bg-card/80" />
+          </Field>
+          <Field>
+            <Skeleton className="h-5 w-48 bg-card/80" />
+            <Skeleton className="h-8 w-full rounded-md bg-card/80" />
+          </Field>
+          <Field>
+            <Skeleton className="h-5 w-48 bg-card/80" />
+            <Skeleton className="h-8 w-full rounded-md bg-card/80" />
+          </Field>
+        </FieldGroup>
+      </div>
+      <Skeleton className="h-4 w-48 bg-card/80" />
+    </div>
+  );
+}
+
 function App() {
-  const { data: listings } = useSuspenseQuery(listingsQueryOptions);
-  const { data: trackedListingIds } = useSuspenseQuery(myTrackedListingsQueryOptions);
-  const { data: session } = useSuspenseQuery(sessionQueryOptions);
-  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set(trackedListingIds));
+  const { data: listings, isLoading: isLoadingListings } = useQuery(listingsQueryOptions);
+  const { data: trackedListingIds, isLoading: isLoadingTracked } = useQuery(myTrackedListingsQueryOptions);
+  const { data: session } = useQuery(sessionQueryOptions);
+  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set(trackedListingIds ?? []));
 
   const [sortBy, setSortBy] = useState<SortOption>("lastChecked");
   const [selectedStorefront, setSelectedStorefront] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [now, setNow] = useState<number | null>(null);
 
+  const isLoading = isLoadingListings || isLoadingTracked;
+
   // Keep local state in sync with server state
   useEffect(() => {
-    setTrackedIds(new Set(trackedListingIds));
+    if (trackedListingIds) {
+      setTrackedIds(new Set(trackedListingIds));
+    }
   }, [trackedListingIds]);
 
   useEffect(() => {
@@ -83,11 +124,13 @@ function App() {
   });
 
   const storefronts = useMemo(() => {
+    if (!listings) return [];
     const unique = new Set(listings.map((l) => l.storefront.name));
     return Array.from(unique).sort();
   }, [listings]);
 
   const filteredAndSortedListings = useMemo(() => {
+    if (!listings) return [];
     let result = [...listings];
 
     if (selectedStorefront !== "all") {
@@ -140,6 +183,19 @@ function App() {
     if (!session) return;
     toggleMutation.mutate(listingId);
   };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-4">
+        <FilterSkeleton />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <ListingCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4">
@@ -203,7 +259,7 @@ function App() {
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Showing {filteredAndSortedListings.length} of {listings.length} listings
+          Showing {filteredAndSortedListings.length} of {listings?.length ?? 0} listings
         </div>
       </div>
 
