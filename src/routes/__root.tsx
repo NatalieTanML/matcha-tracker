@@ -12,12 +12,27 @@ interface RouterContext {
   queryClient: QueryClient;
 }
 
+const SITE_URL = "https://matchadrop.fyi";
+const SITE_NAME = "matchadrop.fyi";
+const DEFAULT_DESCRIPTION = "Get real-time matcha restock notifications. Never miss a matcha restock again.";
+
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "matcha-drop.sh" },
+      { title: "matchadrop.fyi | Real-time Matcha Restock Notifications" },
+      { name: "description", content: DEFAULT_DESCRIPTION },
+      { name: "author", content: "matchadrop.fyi" },
+      { name: "theme-color", content: "#e5edda" },
+      { name: "robots", content: "index, follow" },
+      { property: "og:title", content: "matchadrop.fyi | Real-time Matcha Restock Notifications" },
+      { property: "og:description", content: DEFAULT_DESCRIPTION },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:image", content: `${SITE_URL}/logo512.png` },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:locale", content: "en_US" },
     ],
     links: [
       { rel: "icon", href: "/favicon.ico", sizes: "32x32" },
@@ -25,6 +40,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
       { rel: "manifest", href: "/manifest.json" },
       { rel: "stylesheet", href: appCss },
+      { rel: "canonical", href: SITE_URL },
     ],
   }),
 

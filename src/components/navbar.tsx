@@ -11,9 +11,9 @@ export function Navbar({ session }: NavbarProps) {
     <header className="sticky top-0 z-50 bg-background/60 backdrop-blur">
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 text-lg font-semibold">
-          {/* <img src="/logo192.png" alt="matcha-drop.sh icon" className="h-8 w-auto" /> */}
+          {/* <img src="/logo192.png" alt="matchadrop.fyi icon" className="h-8 w-auto" /> */}
           <span className="text-sprout-500">❯ </span>
-          <span className="hover:text-sprout-500 transition-colors">matcha-drop.sh</span>
+          <span className="hover:text-sprout-500 transition-colors">matchadrop.fyi</span>
         </Link>
         <div className="flex items-center gap-2">
           {session ? (
