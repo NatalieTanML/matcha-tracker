@@ -1,5 +1,3 @@
-import { Leaf02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { Session } from "@/lib/auth-client";
@@ -10,11 +8,12 @@ interface NavbarProps {
 
 export function Navbar({ session }: NavbarProps) {
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/75 backdrop-blur">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 text-lg font-semibold">
-          <HugeiconsIcon icon={Leaf02Icon} className="size-5 text-primary" />
-          <span>Matcha Tracker</span>
+    <header className="sticky top-0 z-50 bg-background/60 backdrop-blur">
+      <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-3 text-lg font-semibold">
+          {/* <img src="/logo192.png" alt="matcha-drop.sh icon" className="h-8 w-auto" /> */}
+          <span className="text-sprout-500">❯ </span>
+          <span className="hover:text-sprout-500 transition-colors">matcha-drop.sh</span>
         </Link>
         <div className="flex items-center gap-2">
           {session ? (

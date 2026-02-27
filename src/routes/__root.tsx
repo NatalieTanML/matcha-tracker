@@ -17,7 +17,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Matcha Drop" },
+      { title: "matcha-drop.sh" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),

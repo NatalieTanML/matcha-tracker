@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query";
+import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import { generateTelegramLinkCode, getSession, getTelegramStatus, unlinkTelegram } from "@/server/auth";
 import { getListings, getMyTrackedListings, toggleTracking } from "@/server/matcha";
 
@@ -17,13 +17,13 @@ export const telegramStatusQueryOptions = queryOptions({
   staleTime: 60 * 1000,
 });
 
-export const telegramLinkCodeMutationOptions = {
+export const telegramLinkCodeMutationOptions = mutationOptions({
   mutationFn: () => generateTelegramLinkCode(),
-};
+});
 
-export const telegramUnlinkMutationOptions = {
+export const telegramUnlinkMutationOptions = mutationOptions({
   mutationFn: () => unlinkTelegram(),
-};
+});
 
 // Matcha queries
 export const listingsQueryOptions = queryOptions({
@@ -40,6 +40,6 @@ export const myTrackedListingsQueryOptions = queryOptions({
   gcTime: 10 * 60 * 1000,
 });
 
-export const toggleTrackingMutationOptions = {
+export const toggleTrackingMutationOptions = mutationOptions({
   mutationFn: (listingId: string) => toggleTracking({ data: { listingId } }),
-};
+});

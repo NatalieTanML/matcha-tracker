@@ -1,10 +1,11 @@
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import {
   listingsQueryOptions,
   myTrackedListingsQueryOptions,
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
     ]);
   },
   component: App,
-  pendingComponent: () => <div className="container mx-auto p-4">Loading...</div>,
+  pendingComponent: () => <Spinner className="size8" />,
 });
 
 type SortOption = "lastChecked" | "storefront";
@@ -142,7 +143,7 @@ function App() {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="mb-6 p-4 bg-muted/50 rounded-lg space-y-4 border">
+      <div className="mb-6 p-4 bg-muted rounded-lg space-y-4 border">
         <div className="flex flex-wrap gap-4 items-end">
           <FieldGroup className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field>
@@ -150,13 +151,13 @@ function App() {
                 Sort by
               </FieldLabel>
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                <SelectTrigger className="bg-background">
+                <SelectTrigger className="bg-card/80">
                   <SelectValue id="sortBy" />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   <SelectGroup>
-                    <SelectItem value="lastChecked">Last Updated</SelectItem>
-                    <SelectItem value="storefront">Storefront Name</SelectItem>
+                    <SelectItem value="lastChecked">Last updated</SelectItem>
+                    <SelectItem value="storefront">Storefront name</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -166,7 +167,7 @@ function App() {
                 Storefront
               </FieldLabel>
               <Select value={selectedStorefront} onValueChange={setSelectedStorefront}>
-                <SelectTrigger className="bg-background">
+                <SelectTrigger className="bg-card/80">
                   <SelectValue id="storefront" />
                 </SelectTrigger>
                 <SelectContent position="popper">
@@ -183,17 +184,17 @@ function App() {
             </Field>
             <Field>
               <FieldLabel className="text-muted-foreground" htmlFor="stockStatus">
-                Stock Status
+                Stock status
               </FieldLabel>
               <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
-                <SelectTrigger className="bg-background">
+                <SelectTrigger className="bg-card/80">
                   <SelectValue id="stockStatus" />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   <SelectGroup>
                     <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="inStock">In Stock</SelectItem>
-                    <SelectItem value="outOfStock">Out of Stock</SelectItem>
+                    <SelectItem value="inStock">In stock</SelectItem>
+                    <SelectItem value="outOfStock">Out of stock</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -216,7 +217,10 @@ function App() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {filteredAndSortedListings.map((listing) => (
-            <div key={listing.id} className="border rounded-lg flex flex-col hover:shadow-lg transition-shadow bg-card">
+            <div
+              key={listing.id}
+              className="border rounded-lg flex flex-col hover:shadow-lg transition-shadow bg-card/80"
+            >
               {listing.matcha.imageUrl && (
                 <div className="p-4 pb-2">
                   <div className="aspect-square overflow-hidden rounded-md bg-muted">
@@ -243,7 +247,7 @@ function App() {
                 </Badge>
                 <div className="flex items-center gap-2">
                   {listing.price && <span className="text-sm text-muted-foreground">{listing.price}</span>}
-                  {session ? (
+                  {session && (
                     <Button
                       variant={trackedIds.has(listing.id) ? "default" : "outline"}
                       size="sm"
@@ -251,10 +255,6 @@ function App() {
                       disabled={toggleMutation.isPending}
                     >
                       {trackedIds.has(listing.id) ? "🔔" : "🔕"}
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to="/login">Login to track</Link>
                     </Button>
                   )}
                 </div>

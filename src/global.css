@@ -19,11 +19,11 @@
   --sprout-900: oklch(0.3507 0.0459 133.47);
   --sprout-950: oklch(0.2368 0.0341 133.24);
 
-  --background: oklch(0.99 0.001 106.423);
-  --foreground: oklch(0.3 0.006 56.043);
-  --card: oklch(0.997 0.001 106.424);
+  --background: oklch(0.9798 0.0045 78.3);
+  --foreground: oklch(0.212 0.006 56.043);
+  --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.997 0.001 106.424);
+  --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
 
   --primary: var(--sprout-300);

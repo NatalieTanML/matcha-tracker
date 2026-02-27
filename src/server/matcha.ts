@@ -27,12 +27,12 @@ export const getListings = createServerFn({
 
 export const getMyTrackedListings = createServerFn({
   method: "GET",
-}).handler(async () => {
+}).handler(async (): Promise<string[]> => {
   const headers = getRequestHeaders();
   const auth = createAuth(env);
   const session = await auth.api.getSession({ headers });
 
-  if (!session) return [] as string[];
+  if (!session) return [];
 
   const db = createDb(env.DATABASE_URL);
   const prefs = await db.query.userNotificationPreferences.findMany({
@@ -59,7 +59,7 @@ export const toggleTracking = createServerFn({
   method: "POST",
 })
   .inputValidator(toggleTrackingValidator)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ tracked: boolean }> => {
     const headers = getRequestHeaders();
     const auth = createAuth(env);
     const session = await auth.api.getSession({ headers });
