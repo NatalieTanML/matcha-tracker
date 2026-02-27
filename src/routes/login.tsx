@@ -42,13 +42,13 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-57px)] items-center justify-center px-4">
+    <div className="flex h-[calc(100dvh-4rem)] items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
           <h1 className="text-lg font-semibold">Sign in</h1>
           <p className="text-xs text-muted-foreground">
             Don't have an account?{" "}
-            <Link to="/register" className="text-primary hover:underline">
+            <Link to="/register" className="text-sprout-400 hover:underline">
               Register
             </Link>
           </p>

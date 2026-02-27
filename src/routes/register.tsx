@@ -44,13 +44,13 @@ function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-57px)] items-center justify-center px-4">
+    <div className="flex h-[calc(100dvh-4rem)] items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
           <h1 className="text-lg font-semibold">Create an account</h1>
           <p className="text-xs text-muted-foreground">
             Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline">
+            <Link to="/login" className="text-sprout-400 hover:underline">
               Sign in
             </Link>
           </p>
@@ -96,7 +96,7 @@ function RegisterPage() {
 
           {error && <p className="text-xs text-destructive">{error}</p>}
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button variant="default" type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
           </Button>
         </form>

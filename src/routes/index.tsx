@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   listingsQueryOptions,
   myTrackedListingsQueryOptions,
@@ -144,51 +144,57 @@ function App() {
     <div className="container mx-auto p-4">
       <div className="mb-6 p-4 bg-muted/50 rounded-lg space-y-4 border">
         <div className="flex flex-wrap gap-4 items-end">
-          <FieldGroup className="space-y-1 w-full md:w-sm">
-            <Field className="text-sm text-muted-foreground">
-              <FieldLabel htmlFor="sortBy">Sort by</FieldLabel>
+          <FieldGroup className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Field>
+              <FieldLabel className="text-muted-foreground" htmlFor="sortBy">
+                Sort by
+              </FieldLabel>
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue id="sortBy" />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  <SelectItem value="lastChecked">Last Updated</SelectItem>
-                  <SelectItem value="storefront">Storefront Name</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="lastChecked">Last Updated</SelectItem>
+                    <SelectItem value="storefront">Storefront Name</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
-          </FieldGroup>
-
-          <FieldGroup className="space-y-1 w-full md:w-sm">
-            <Field className="text-sm text-muted-foreground">
-              <FieldLabel htmlFor="storefront">Storefront</FieldLabel>
+            <Field>
+              <FieldLabel className="text-muted-foreground" htmlFor="storefront">
+                Storefront
+              </FieldLabel>
               <Select value={selectedStorefront} onValueChange={setSelectedStorefront}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue id="storefront" />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  <SelectItem value="all">All Storefronts</SelectItem>
-                  {storefronts.map((storefront) => (
-                    <SelectItem key={storefront} value={storefront}>
-                      {storefront}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    <SelectItem value="all">All Storefronts</SelectItem>
+                    {storefronts.map((storefront) => (
+                      <SelectItem key={storefront} value={storefront}>
+                        {storefront}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
-          </FieldGroup>
-
-          <FieldGroup className="space-y-1 w-full md:w-sm">
-            <Field className="text-sm text-muted-foreground">
-              <FieldLabel htmlFor="stockStatus">Stock Status</FieldLabel>
+            <Field>
+              <FieldLabel className="text-muted-foreground" htmlFor="stockStatus">
+                Stock Status
+              </FieldLabel>
               <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue id="stockStatus" />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="inStock">In Stock</SelectItem>
-                  <SelectItem value="outOfStock">Out of Stock</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="inStock">In Stock</SelectItem>
+                    <SelectItem value="outOfStock">Out of Stock</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
