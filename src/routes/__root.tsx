@@ -5,7 +5,7 @@ import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanst
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { Navbar } from "@/components/navbar";
 import { sessionQueryOptions } from "@/lib/query-options";
-import appCss from "../globals.css?url";
+import appCss from "../global.css?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 
 interface RouterContext {
@@ -19,15 +19,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Matcha Drop" },
     ],
-    links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap",
-      },
-      { rel: "stylesheet", href: appCss },
-    ],
+    links: [{ rel: "stylesheet", href: appCss }],
   }),
 
   // Prefetch session on initial load, but don't block
