@@ -1,12 +1,21 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { sessionQueryOptions } from "@/lib/query-options";
+
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -15,28 +24,31 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
+  async function onSubmit(data: LoginFormData) {
     const { error } = await authClient.signIn.email({
-      email,
-      password,
+      email: data.email,
+      password: data.password,
     });
 
     if (error) {
-      setError(error.message ?? "Sign in failed");
-      setLoading(false);
+      setError("root", { message: error.message ?? "Sign in failed" });
       return;
     }
 
-    // Invalidate session query to trigger re-fetch
     await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
     await router.invalidate();
     router.navigate({ to: "/" });
@@ -55,46 +67,38 @@ function LoginPage() {
               </Link>
             </CardDescription>
           </CardHeader>
-          <FieldGroup>
-            <CardContent>
-              <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <FieldGroup>
+              <CardContent>
                 <div className="flex flex-col gap-6">
                   <Field>
                     <FieldLabel htmlFor="email">Email</FieldLabel>
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
+                    <Input id="email" type="email" autoComplete="email" {...register("email")} />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
                   </Field>
 
                   <Field>
                     <FieldLabel htmlFor="password">Password</FieldLabel>
-                    <Input
-                      id="password"
-                      type="password"
-                      autoComplete="current-password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
+                    <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
+                    {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
                   </Field>
                 </div>
-              </form>
-            </CardContent>
+              </CardContent>
 
-            {error && <p className="text-xs text-destructive">{error}</p>}
-            <CardFooter>
-              <Field>
-                <Button variant="default" type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Signing in..." : "Sign in"}
-                </Button>
-              </Field>
-            </CardFooter>
-          </FieldGroup>
+              {errors.root && (
+                <CardContent>
+                  <p className="text-xs text-destructive">{errors.root.message}</p>
+                </CardContent>
+              )}
+              <CardFooter>
+                <Field>
+                  <Button variant="default" type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? "Signing in..." : "Sign in"}
+                  </Button>
+                </Field>
+              </CardFooter>
+            </FieldGroup>
+          </form>
         </Card>
       </div>
     </div>

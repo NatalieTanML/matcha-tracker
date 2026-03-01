@@ -24,7 +24,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "matchadrop.fyi | Real-time Matcha Restock Notifications" },
       { name: "description", content: DEFAULT_DESCRIPTION },
-      { name: "author", content: "matchadrop.fyi" },
+      { name: "author", content: SITE_NAME },
       { name: "theme-color", content: "#e5edda" },
       { name: "robots", content: "index, follow" },
       { property: "og:title", content: "matchadrop.fyi | Real-time Matcha Restock Notifications" },
