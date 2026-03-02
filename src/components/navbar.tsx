@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Session } from "@/lib/auth-client";
 
@@ -7,11 +8,29 @@ interface NavbarProps {
 }
 
 export function Navbar({ session }: NavbarProps) {
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 5);
+    };
+
+    // Check initial scroll position
+    handleScroll();
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-50 bg-background/70 backdrop-blur" style={{ backdropFilter: "blur(8px)" }}>
+    <header
+      className={`sticky top-0 z-50 bg-background/70 backdrop-blur transition-all duration-500 ${
+        isScrolled ? "border-b" : ""
+      }`}
+      style={{ backdropFilter: "blur(8px)" }}
+    >
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 text-lg font-semibold">
-          {/* <img src="/logo192.png" alt="matchadrop.fyi icon" className="h-8 w-auto" /> */}
           <span className="text-sprout-500">❯ </span>
           <span className="hover:text-sprout-500 transition-colors">matchadrop.fyi</span>
         </Link>

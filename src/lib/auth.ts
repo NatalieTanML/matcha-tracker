@@ -1,7 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin } from "better-auth/plugins";
+import { admin, magicLink } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { Resend } from "resend";
+import { MagicLinkEmail } from "@/components/emails";
 import { createDb } from "@/db";
 import * as schema from "@/db/schema";
 
@@ -13,6 +15,7 @@ export function createAuth(env: {
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   ADMIN_USER_ID?: string;
+  RESEND_API_KEY?: string;
 }) {
   const db = createDb(env.DATABASE_URL);
 
@@ -31,14 +34,35 @@ export function createAuth(env: {
     }),
 
     emailAndPassword: {
-      enabled: true,
-      minPasswordLength: 8,
+      enabled: false,
     },
 
     plugins: [
       admin({
         adminUserIds: env.ADMIN_USER_ID ? [env.ADMIN_USER_ID] : [],
         defaultRole: "user",
+      }),
+      magicLink({
+        expiresIn: 60 * 5,
+        rateLimit: {
+          window: 60,
+          max: 5,
+        },
+        sendMagicLink: async ({ email, url }) => {
+          const resend = new Resend(env.RESEND_API_KEY);
+
+          const { error } = await resend.emails.send({
+            from: "matchadrop.fyi <auth@matchadrop.fyi>",
+            to: email,
+            subject: "Sign in to matchadrop.fyi",
+            react: MagicLinkEmail({ url, expiresInMinutes: 5 }),
+          });
+
+          if (error) {
+            console.error("Failed to send email:", error);
+            throw new Error(`Failed to send magic link email: ${error.message}`);
+          }
+        },
       }),
       // Must be the LAST plugin — handles cookie-setting for TanStack Start server fns
       tanstackStartCookies(),

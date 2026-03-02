@@ -56,7 +56,7 @@ async function handleTelegramWebhook(update: TelegramUpdate, _env: Env, _ctx: Ex
     await sendTelegramMessage(
       botToken,
       chatId,
-      "Send <code>/link YOUR_CODE</code> to link your account.\n\nGet your code from your profile page on Matcha Tracker.",
+      "Send <code>/link YOUR_CODE</code> to link your account.\n\nGet your code from your profile page on matchadrop.fyi.",
     );
     return;
   }
