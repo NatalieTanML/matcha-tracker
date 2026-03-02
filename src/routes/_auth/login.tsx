@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email"),
+  email: z.email("Please enter a valid email"),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -34,7 +34,10 @@ function LoginPage() {
   });
 
   async function onSubmit(data: LoginFormData) {
-    const { error } = await authClient.signIn.magicLink({ email: data.email });
+    const { error } = await authClient.signIn.magicLink({
+      email: data.email,
+      callbackURL: "/magic-link/verify",
+    });
 
     if (error) {
       setError("root", { message: error.message ?? "Failed to send magic link" });

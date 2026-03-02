@@ -2,14 +2,17 @@ import { Body, Button, Container, Head, Html, Preview, Section, Text } from "@re
 
 interface MagicLinkEmailProps {
   url: string;
+  name?: string;
   expiresInMinutes?: number;
 }
 
-export function MagicLinkEmail({ url, expiresInMinutes = 5 }: MagicLinkEmailProps) {
+export function MagicLinkEmail({ url, name, expiresInMinutes = 5 }: MagicLinkEmailProps) {
+  const greeting = name ? `Hi ${name},` : "Hi there,";
+
   return (
     <Html>
       <Head />
-      <Preview>Sign in to matchadrop.fyi</Preview>
+      <Preview>Click the link to sign in to matchadrop.fyi</Preview>
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
@@ -21,6 +24,8 @@ export function MagicLinkEmail({ url, expiresInMinutes = 5 }: MagicLinkEmailProp
 
           <Section style={contentSection}>
             <Text style={heading}>Let's get you signed in</Text>
+
+            <Text style={paragraph}>{greeting}</Text>
 
             <Text style={paragraph}>
               Click the button below to sign in to your account. This link will expire in {expiresInMinutes} minutes for

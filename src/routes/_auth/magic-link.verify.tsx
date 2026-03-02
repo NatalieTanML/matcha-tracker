@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { AuthCard, AuthLayout } from "@/components/auth";
 import { CardContent } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
@@ -13,58 +13,41 @@ export const Route = createFileRoute("/_auth/magic-link/verify")({
 function MagicLinkVerifyPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [errorMessage, setErrorMessage] = useState("");
+
+  const { data: sessionData, isPending } = authClient.useSession();
 
   useEffect(() => {
-    const verifyToken = async () => {
-      const url = new URL(window.location.href);
-      const token = url.searchParams.get("token");
+    if (isPending) return;
 
-      if (!token) {
-        setStatus("error");
-        setErrorMessage("Invalid or missing token");
-        return;
-      }
+    if (sessionData?.session) {
+      queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
 
-      const { error } = await authClient.magicLink.verify({
-        query: { token },
-      });
-
-      if (error) {
-        setStatus("error");
-        setErrorMessage(error.message ?? "Failed to verify magic link");
-        return;
-      }
-
-      await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
-      setStatus("success");
-
-      setTimeout(() => {
+      // Short delay so user sees success message
+      const timer = setTimeout(() => {
         navigate({ to: "/" });
       }, 1500);
-    };
 
-    verifyToken();
-  }, [navigate, queryClient]);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionData, isPending, navigate, queryClient]);
 
-  const title = status === "loading" ? "Verifying..." : status === "success" ? "Success!" : "Verification failed";
+  const title = isPending ? "Verifying..." : sessionData?.session ? "Success!" : "Verification failed";
 
-  const description =
-    status === "loading"
-      ? "Please wait while we verify your magic link..."
-      : status === "success"
-        ? "You are now signed in. Redirecting..."
-        : errorMessage;
+  const description = isPending
+    ? "Please wait while we sign you in..."
+    : sessionData?.session
+      ? "You are now signed in. Redirecting..."
+      : "This link may have expired or already been used.";
 
   return (
     <AuthLayout>
       <AuthCard title={title} description={description}>
-        {status === "error" && (
-          <CardContent>
-            <a href="/login" className="text-sm text-sprout-400 hover:underline">
+        {!isPending && !sessionData?.session && (
+          <CardContent className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">Please request a new magic link to sign in.</p>
+            <Link to="/login" className="text-sm text-sprout-400 hover:underline">
               Back to sign in
-            </a>
+            </Link>
           </CardContent>
         )}
       </AuthCard>

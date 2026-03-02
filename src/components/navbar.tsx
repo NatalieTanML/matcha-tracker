@@ -14,8 +14,6 @@ export function Navbar({ session }: NavbarProps) {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 5);
     };
-
-    // Check initial scroll position
     handleScroll();
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -30,18 +28,18 @@ export function Navbar({ session }: NavbarProps) {
       style={{ backdropFilter: "blur(8px)" }}
     >
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 text-lg font-semibold">
+        <Link to="/" className="flex items-center gap-3 text-sm md:text-lg font-semibold">
           <span className="text-sprout-500">❯ </span>
           <span className="hover:text-sprout-500 transition-colors">matchadrop.fyi</span>
         </Link>
         <div className="flex items-center gap-2">
           {session ? (
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link to="/profile">Profile</Link>
             </Button>
           ) : (
             <>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="outline" size="sm" asChild>
                 <Link to="/login">Sign in</Link>
               </Button>
               <Button variant="default" size="sm" asChild>

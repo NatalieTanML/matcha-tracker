@@ -18,6 +18,7 @@ export function MagicLinkSent({ description, onReset }: MagicLinkSentProps) {
           <button onClick={onReset} className="text-sprout-400 hover:underline">
             try again
           </button>
+          .
         </p>
       </CardContent>
     </Card>

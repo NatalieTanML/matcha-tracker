@@ -12,7 +12,7 @@ import { authClient } from "@/lib/auth-client";
 
 const registerSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Please enter a valid email"),
+  email: z.email("Please enter a valid email"),
 });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -38,6 +38,7 @@ function RegisterPage() {
     const { error } = await authClient.signIn.magicLink({
       email: data.email,
       name: data.name,
+      callbackURL: "/magic-link/verify",
     });
 
     if (error) {

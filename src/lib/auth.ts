@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, magicLink } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { eq } from "drizzle-orm";
 import { Resend } from "resend";
 import { MagicLinkEmail } from "@/components/emails";
 import { createDb } from "@/db";
@@ -51,11 +52,15 @@ export function createAuth(env: {
         sendMagicLink: async ({ email, url }) => {
           const resend = new Resend(env.RESEND_API_KEY);
 
+          const user = await db.query.users.findFirst({
+            where: eq(schema.users.email, email),
+          });
+
           const { error } = await resend.emails.send({
-            from: "matchadrop.fyi <auth@matchadrop.fyi>",
+            from: "matchadrop.fyi <noreply@matchadrop.fyi>",
             to: email,
-            subject: "Sign in to matchadrop.fyi",
-            react: MagicLinkEmail({ url, expiresInMinutes: 5 }),
+            subject: "Your magic link to sign in",
+            react: MagicLinkEmail({ url, name: user?.name, expiresInMinutes: 5 }),
           });
 
           if (error) {
