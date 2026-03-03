@@ -5,7 +5,7 @@ import { createDb } from "../src/db";
 import { listings, scrapeJobs, stockHistory, userNotificationPreferences, users } from "../src/db/schema";
 
 const CONCURRENCY_LIMIT = 5;
-const SAZEN_CONCURRENCY = 3;
+const SAZEN_CONCURRENCY = 1;
 
 interface Listing {
   id: string;
