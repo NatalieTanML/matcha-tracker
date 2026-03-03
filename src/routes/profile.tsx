@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { SectionCard } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,9 +12,9 @@ import {
   telegramStatusQueryOptions,
   telegramUnlinkMutationOptions,
 } from "@/lib/query-options";
+import { LinkCodeDisplay, LinkInstructions } from "./profile/-components";
 
 export const Route = createFileRoute("/profile")({
-  // Check auth and prefetch data
   beforeLoad: async ({ context }) => {
     const session = await context.queryClient.fetchQuery(sessionQueryOptions);
     if (!session) {
@@ -24,7 +25,11 @@ export const Route = createFileRoute("/profile")({
     await context.queryClient.prefetchQuery(telegramStatusQueryOptions);
   },
   component: ProfilePage,
-  pendingComponent: () => <Spinner className="size-8" />,
+  pendingComponent: () => (
+    <div className="flex items-center">
+      <Spinner className="size-8" />
+    </div>
+  ),
 });
 
 function ProfilePage() {
@@ -53,7 +58,6 @@ function ProfilePage() {
 
   async function handleSignOut() {
     await authClient.signOut();
-    // Invalidate session query to trigger re-fetch
     await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
     await router.invalidate();
     router.navigate({ to: "/" });
@@ -61,98 +65,53 @@ function ProfilePage() {
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-8 space-y-8">
-      {/* Account */}
-      <section className="space-y-3">
-        <h1 className="text-lg font-semibold">Profile</h1>
-        <div className="rounded-lg border bg-card p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <p className="text-xs font-medium">{session?.user.name}</p>
-              <p className="text-xs text-muted-foreground">{session?.user.email}</p>
-            </div>
-            {session?.user.role === "admin" && <Badge variant="default">Admin</Badge>}
+      <SectionCard title="Profile">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-sm ">Hello, {session?.user.name}!</p>
+            <p className="text-sm text-muted-foreground">{session?.user.email}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            Sign out
+          {session?.user.role === "admin" && <Badge variant="default">Admin</Badge>}
+        </div>
+        <Button variant="outline" size="sm" onClick={handleSignOut} className="mt-4">
+          Sign out
+        </Button>
+      </SectionCard>
+
+      <SectionCard title="Telegram notifications" description="Link your Telegram account to receive stock alerts.">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-sm text-muted-foreground">Status</span>
+          <Badge variant={isLinked ? "success" : "outline"}>{isLinked ? "Linked" : "Not linked"}</Badge>
+        </div>
+
+        {isLinked ? (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => unlinkMutation.mutate()}
+            disabled={unlinkMutation.isPending}
+          >
+            {unlinkMutation.isPending ? "Unlinking..." : "Unlink Telegram"}
           </Button>
-        </div>
-      </section>
-
-      {/* Telegram */}
-      <section className="space-y-3">
-        <div className="space-y-0.5">
-          <h2 className="text-sm font-semibold">Telegram notifications</h2>
-          <p className="text-xs text-muted-foreground">Link your Telegram account to receive stock alerts.</p>
-        </div>
-
-        <div className="rounded-lg border bg-card p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Status</span>
-            <Badge variant={isLinked ? "success" : "outline"}>{isLinked ? "Linked" : "Not linked"}</Badge>
-          </div>
-
-          {isLinked ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => unlinkMutation.mutate()}
-              disabled={unlinkMutation.isPending}
-            >
-              {unlinkMutation.isPending ? "Unlinking..." : "Unlink Telegram"}
-            </Button>
-          ) : (
-            <div className="space-y-3">
-              {linkCode ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Open your Telegram bot and send:</p>
-                  <div className="rounded-md bg-muted px-3 py-2 font-mono text-sm tracking-widest select-all">
-                    /link {linkCode.code}
-                  </div>
-                  <p className="text-[0.625rem] text-muted-foreground">
-                    Expires at {linkCode.expiresAt.toLocaleTimeString()}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => generateCodeMutation.mutate()}
-                    disabled={generateCodeMutation.isPending}
-                  >
-                    Regenerate code
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                    <li>Click the button below to generate a link code</li>
-                    <li>
-                      Open{" "}
-                      <a
-                        href="https://t.me/matchadropbot"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        your Telegram bot
-                      </a>
-                    </li>
-                    <li>
-                      Send the code using <code className="bg-muted px-1 rounded">/link CODE</code>
-                    </li>
-                  </ol>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => generateCodeMutation.mutate()}
-                    disabled={generateCodeMutation.isPending}
-                  >
-                    {generateCodeMutation.isPending ? "Generating..." : "Generate link code"}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
+        ) : (
+          <>
+            {linkCode ? (
+              <LinkCodeDisplay
+                code={linkCode.code}
+                expiresAt={linkCode.expiresAt}
+                onRegenerate={() => generateCodeMutation.mutate()}
+                isRegenerating={generateCodeMutation.isPending}
+              />
+            ) : (
+              <LinkInstructions
+                botUsername="matchadropbot"
+                onGenerate={() => generateCodeMutation.mutate()}
+                isGenerating={generateCodeMutation.isPending}
+              />
+            )}
+          </>
+        )}
+      </SectionCard>
     </div>
   );
 }

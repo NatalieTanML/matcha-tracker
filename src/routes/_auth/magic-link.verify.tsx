@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { AuthCard, AuthLayout } from "@/components/auth";
+import { SectionCard } from "@/components/common";
 import { CardContent } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
 import { sessionQueryOptions } from "@/lib/query-options";
@@ -40,17 +40,15 @@ function MagicLinkVerifyPage() {
       : "This link may have expired or already been used.";
 
   return (
-    <AuthLayout>
-      <AuthCard title={title} description={description}>
-        {!isPending && !sessionData?.session && (
-          <CardContent className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">Please request a new magic link to sign in.</p>
-            <Link to="/login" className="text-sm text-sprout-400 hover:underline">
-              Back to sign in
-            </Link>
-          </CardContent>
-        )}
-      </AuthCard>
-    </AuthLayout>
+    <SectionCard title={title} description={description}>
+      {!isPending && !sessionData?.session && (
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">Please request a new magic link to sign in.</p>
+          <Link to="/login" className="text-sm text-sprout-400 hover:underline">
+            Back to sign in
+          </Link>
+        </CardContent>
+      )}
+    </SectionCard>
   );
 }

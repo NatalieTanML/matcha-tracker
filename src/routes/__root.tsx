@@ -4,6 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { Navbar } from "@/components/navbar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { sessionQueryOptions } from "@/lib/query-options";
 import appCss from "../global.css?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
@@ -61,8 +62,10 @@ function RootDocument() {
         <HeadContent />
       </head>
       <body>
-        <Navbar session={session ?? null} />
-        <Outlet />
+        <TooltipProvider delayDuration={300}>
+          <Navbar session={session ?? null} />
+          <Outlet />
+        </TooltipProvider>
         <TanStackDevtools
           config={{ position: "bottom-right" }}
           plugins={[{ name: "Tanstack Router", render: <TanStackRouterDevtoolsPanel /> }, TanStackQueryDevtools]}
