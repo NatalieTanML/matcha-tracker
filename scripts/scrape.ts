@@ -5,7 +5,7 @@ import { createDb } from "../src/db";
 import { listings, scrapeJobs, stockHistory, userNotificationPreferences, users } from "../src/db/schema";
 
 const CONCURRENCY_LIMIT = 5;
-const SAZEN_CONCURRENCY = 1;
+const SAZEN_CONCURRENCY = 3;
 
 interface Listing {
   id: string;
@@ -325,9 +325,9 @@ async function checkStock(listing: Listing): Promise<boolean> {
 
 function parseSazenStock(html: string): boolean {
   const root = parse(html);
-  const outOfStockText = root.querySelector("p strong.red")?.text?.trim() || "";
-  const inStockForm = root.querySelector("form#basket-add");
-  return !outOfStockText.includes("This product is unavailable") && !!inStockForm;
+  const outOfStockText = root.querySelector("p strong.red")?.text?.trim().toLowerCase() || "";
+  const addToCartButton = root.querySelector("button#product-add-to-basket")?.text?.trim().toLowerCase() || "";
+  return !outOfStockText.includes("this product is unavailable") && addToCartButton === "add to cart";
 }
 
 function parseIppodoStock(html: string): boolean {
