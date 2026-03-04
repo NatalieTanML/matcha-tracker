@@ -1,6 +1,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import { generateTelegramLinkCode, getSession, getTelegramStatus, unlinkTelegram } from "@/server/auth";
-import { getListings, getMyTrackedListings, toggleTracking } from "@/server/matcha";
+import { getListings, toggleTracking } from "@/server/matcha";
+import { getMyTrackedListings, updateNotificationMode } from "@/server/notifications";
 
 // Auth queries
 export const sessionQueryOptions = queryOptions({
@@ -42,4 +43,9 @@ export const myTrackedListingsQueryOptions = queryOptions({
 
 export const toggleTrackingMutationOptions = mutationOptions({
   mutationFn: (listingId: string) => toggleTracking({ data: { listingId } }),
+});
+
+export const updateNotificationModeMutationOptions = mutationOptions({
+  mutationFn: (data: { listingId: string; notificationMode: "none" | "individual" | "grouped" }) =>
+    updateNotificationMode({ data }),
 });

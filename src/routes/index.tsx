@@ -67,9 +67,10 @@ function FilterSkeleton() {
 
 function App() {
   const { data: listings, isLoading: isLoadingListings } = useQuery(listingsQueryOptions);
-  const { data: trackedListingIds, isLoading: isLoadingTracked } = useQuery(myTrackedListingsQueryOptions);
+  const { data: trackedListings, isLoading: isLoadingTracked } = useQuery(myTrackedListingsQueryOptions);
   const { data: session } = useQuery(sessionQueryOptions);
-  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set(trackedListingIds ?? []));
+  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set());
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const [sortBy, setSortBy] = useState<SortOption>("lastChecked");
   const [selectedStorefront, setSelectedStorefront] = useState<string>("all");
@@ -80,10 +81,10 @@ function App() {
 
   // Keep local state in sync with server state
   useEffect(() => {
-    if (trackedListingIds) {
-      setTrackedIds(new Set(trackedListingIds));
+    if (trackedListings) {
+      setTrackedIds(new Set(trackedListings.map((t) => t.listingId)));
     }
-  }, [trackedListingIds]);
+  }, [trackedListings]);
 
   useEffect(() => {
     setNow(Date.now());
@@ -94,6 +95,7 @@ function App() {
   const toggleMutation = useMutation({
     ...toggleTrackingMutationOptions,
     onMutate: async (listingId) => {
+      setTogglingId(listingId);
       // Optimistic update
       const isTracked = trackedIds.has(listingId);
       setTrackedIds((prev) => {
@@ -120,6 +122,9 @@ function App() {
           return next;
         });
       }
+    },
+    onSettled: () => {
+      setTogglingId(null);
     },
   });
 
@@ -264,9 +269,9 @@ function App() {
       </div>
 
       {filteredAndSortedListings.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
+        <div className="text-center py-8 text-muted-foreground space-y-2">
           <p className="text-lg">No matcha items match your filters.</p>
-          <Button variant="link" onClick={clearFilters} className="mt-2">
+          <Button variant="link" onClick={clearFilters}>
             Clear filters
           </Button>
         </div>
@@ -308,9 +313,10 @@ function App() {
                       variant={trackedIds.has(listing.id) ? "default" : "outline"}
                       size="sm"
                       onClick={() => handleToggleTracking(listing.id)}
-                      disabled={toggleMutation.isPending}
+                      disabled={togglingId !== null}
+                      className={togglingId === listing.id ? "opacity-50" : ""}
                     >
-                      {trackedIds.has(listing.id) ? "🔔" : "🔕"}
+                      {trackedIds.has(listing.id) ? "Tracked" : "Track"}
                     </Button>
                   )}
                 </div>

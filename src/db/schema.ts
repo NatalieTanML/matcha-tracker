@@ -1,5 +1,7 @@
 import { relations } from "drizzle-orm";
-import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+export const notificationModeEnum = pgEnum("notification_mode", ["none", "individual", "grouped"]);
 
 // ============================================================
 // Better Auth core tables
@@ -142,7 +144,9 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   listingId: text("listing_id")
     .notNull()
     .references(() => listings.id, { onDelete: "cascade" }),
+  notificationMode: notificationModeEnum("notification_mode").default("none").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const scrapeJobs = pgTable("scrape_jobs", {
@@ -162,6 +166,19 @@ export const telegramLinkCodes = pgTable("telegram_link_codes", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Notification log
+export const notificationsSent = pgTable("notifications_sent", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  listingId: text("listing_id").references(() => listings.id, { onDelete: "cascade" }),
+  notificationMode: notificationModeEnum("notification_mode").notNull(),
+  inStock: boolean("in_stock").notNull(),
+  messageSent: text("message_sent").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -230,6 +247,11 @@ export const telegramLinkCodesRelations = relations(telegramLinkCodes, ({ one })
   user: one(users, { fields: [telegramLinkCodes.userId], references: [users.id] }),
 }));
 
+export const notificationsSentRelations = relations(notificationsSent, ({ one }) => ({
+  user: one(users, { fields: [notificationsSent.userId], references: [users.id] }),
+  listing: one(listings, { fields: [notificationsSent.listingId], references: [listings.id] }),
+}));
+
 // ============================================================
 // Types
 // ============================================================
@@ -246,3 +268,5 @@ export type UserNotificationPreference = typeof userNotificationPreferences.$inf
 export type ScrapeJob = typeof scrapeJobs.$inferSelect;
 export type StorefrontsBrands = typeof storefrontsBrands.$inferSelect;
 export type TelegramLinkCode = typeof telegramLinkCodes.$inferSelect;
+export type NotificationsSent = typeof notificationsSent.$inferSelect;
+export type NotificationMode = typeof notificationModeEnum.enumValues;

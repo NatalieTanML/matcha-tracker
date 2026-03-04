@@ -4,6 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { Navbar } from "@/components/navbar";
+import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { sessionQueryOptions } from "@/lib/query-options";
 import appCss from "../global.css?url";
@@ -84,9 +85,9 @@ function NotFound() {
         <h1 className="text-2xl font-semibold">Page not found</h1>
         <p className="text-muted-foreground">This page doesn't exist or has been moved.</p>
       </div>
-      <Link to="/" className="text-sm text-sprout-400 hover:underline">
-        Back to home
-      </Link>
+      <Button variant="link" asChild>
+        <Link to="/">Back to home</Link>
+      </Button>
     </main>
   );
 }

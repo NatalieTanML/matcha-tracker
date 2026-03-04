@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { parse } from "node-html-parser";
 import PQueue from "p-queue";
 import { createDb } from "../src/db";
-import { listings, scrapeJobs, stockHistory, userNotificationPreferences, users } from "../src/db/schema";
+import { listings, notificationsSent, scrapeJobs, stockHistory, userNotificationPreferences, users } from "../src/db/schema";
 
 const CONCURRENCY_LIMIT = 5;
 const SAZEN_CONCURRENCY = 3;
@@ -46,18 +46,33 @@ async function sendTelegramMessage(botToken: string, chatId: string, text: strin
   }
 }
 
+interface WatcherInfo {
+  userId: string;
+  telegramChatId: string | null;
+  notificationMode: "none" | "individual" | "grouped";
+}
+
+interface GroupedNotification {
+  userId: string;
+  telegramChatId: string;
+  inStockItems: string[];
+  outOfStockItems: string[];
+}
+
 async function notifyUsers(
   db: ReturnType<typeof createDb>,
   listing: Listing,
   inStock: boolean,
-  botToken: string | undefined
+  botToken: string | undefined,
+  groupedNotifications: Map<string, GroupedNotification>
 ) {
   if (!botToken) return;
 
-  const watchers = await db
+  const watchers: WatcherInfo[] = await db
     .select({
       userId: userNotificationPreferences.userId,
       telegramChatId: users.telegramChatId,
+      notificationMode: userNotificationPreferences.notificationMode,
     })
     .from(userNotificationPreferences)
     .innerJoin(users, eq(userNotificationPreferences.userId, users.id))
@@ -67,13 +82,94 @@ async function notifyUsers(
   const message = `${status}: ${listing.matcha.brand.name} - ${listing.matcha.name}\n${listing.storefront.name}`;
 
   for (const watcher of watchers) {
-    if (watcher.telegramChatId) {
+    if (!watcher.telegramChatId) continue;
+
+    if (watcher.notificationMode === "individual") {
       await sendTelegramMessage(botToken, watcher.telegramChatId, message);
+      await db.insert(notificationsSent).values({
+        id: crypto.randomUUID(),
+        userId: watcher.userId,
+        listingId: listing.id,
+        notificationMode: "individual",
+        inStock,
+        messageSent: message,
+      });
+    } else if (watcher.notificationMode === "grouped") {
+      if (!groupedNotifications.has(watcher.userId)) {
+        groupedNotifications.set(watcher.userId, {
+          userId: watcher.userId,
+          telegramChatId: watcher.telegramChatId,
+          inStockItems: [],
+          outOfStockItems: [],
+        });
+      }
+      const grouped = groupedNotifications.get(watcher.userId)!;
+      if (inStock) {
+        grouped.inStockItems.push(`${listing.matcha.brand.name} - ${listing.matcha.name}`);
+      } else {
+        grouped.outOfStockItems.push(`${listing.matcha.brand.name} - ${listing.matcha.name}`);
+      }
     }
   }
 
-  if (watchers.length > 0) {
-    console.log(`  📱 Notified ${watchers.length} user(s) about ${listing.matcha.name}`);
+  const activeWatchers = watchers.filter((w) => w.notificationMode !== "none");
+  if (activeWatchers.length > 0) {
+    console.log(`  📱 Notified ${activeWatchers.length} user(s) about ${listing.matcha.name}`);
+  }
+}
+
+async function sendGroupedNotifications(
+  db: ReturnType<typeof createDb>,
+  groupedNotifications: Map<string, GroupedNotification>,
+  botToken: string
+) {
+  for (const grouped of groupedNotifications.values()) {
+    if (grouped.inStockItems.length === 0 && grouped.outOfStockItems.length === 0) continue;
+
+    let message = "📢 <b>Stock Update</b>\n\n";
+
+    if (grouped.inStockItems.length > 0) {
+      message += "🟢 <b>Back in Stock:</b>\n";
+      for (const item of grouped.inStockItems) {
+        message += `  • ${item}\n`;
+      }
+      message += "\n";
+    }
+
+    if (grouped.outOfStockItems.length > 0) {
+      message += "🔴 <b>Out of Stock:</b>\n";
+      for (const item of grouped.outOfStockItems) {
+        message += `  • ${item}\n`;
+      }
+    }
+
+    await sendTelegramMessage(botToken, grouped.telegramChatId, message);
+
+    for (const item of grouped.inStockItems) {
+      await db.insert(notificationsSent).values({
+        id: crypto.randomUUID(),
+        userId: grouped.userId,
+        listingId: null,
+        notificationMode: "grouped",
+        inStock: true,
+        messageSent: item,
+      });
+    }
+
+    for (const item of grouped.outOfStockItems) {
+      await db.insert(notificationsSent).values({
+        id: crypto.randomUUID(),
+        userId: grouped.userId,
+        listingId: null,
+        notificationMode: "grouped",
+        inStock: false,
+        messageSent: item,
+      });
+    }
+  }
+
+  if (groupedNotifications.size > 0) {
+    console.log(`  📱 Sent grouped notifications to ${groupedNotifications.size} user(s)`);
   }
 }
 
@@ -87,6 +183,8 @@ async function main() {
 
   const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
   const db = createDb(databaseUrl);
+
+  const groupedNotifications = new Map<string, GroupedNotification>();
 
   const [scrapeJob] = await db
     .insert(scrapeJobs)
@@ -140,7 +238,13 @@ async function main() {
       );
 
       const startTime = Date.now();
-      const results = await processWithQueue(storefrontListings, db, telegramBotToken, concurrency);
+      const results = await processWithQueue(
+        storefrontListings,
+        db,
+        telegramBotToken,
+        concurrency,
+        groupedNotifications
+      );
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
       const changedCount = results.filter((r) => r.changed).length;
@@ -172,6 +276,10 @@ async function main() {
     errors.push(...result.errors);
   }
 
+  if (telegramBotToken) {
+    await sendGroupedNotifications(db, groupedNotifications, telegramBotToken);
+  }
+
   await db
     .update(scrapeJobs)
     .set({
@@ -197,7 +305,8 @@ async function processWithQueue(
   storefrontListings: Listing[],
   db: ReturnType<typeof createDb>,
   botToken: string | undefined,
-  concurrency: number
+  concurrency: number,
+  groupedNotifications: Map<string, GroupedNotification>
 ): Promise<ProcessResult[]> {
   const queue = new PQueue({ concurrency });
 
@@ -220,7 +329,7 @@ async function processWithQueue(
             .where(eq(listings.id, listing.id));
 
           // Send Telegram notifications
-          await notifyUsers(db, listing, inStock, botToken);
+          await notifyUsers(db, listing, inStock, botToken, groupedNotifications);
 
           return {
             listing,

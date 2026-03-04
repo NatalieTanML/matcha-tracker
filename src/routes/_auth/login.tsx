@@ -3,9 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { SectionCard } from "@/components/common";
 import { Button } from "@/components/ui/button";
-import { CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
@@ -58,17 +57,16 @@ function LoginPage() {
   }
 
   return (
-    <SectionCard
-      title="Sign in"
-      description={
-        <>
+    <Card>
+      <CardHeader>
+        <CardTitle>Sign in</CardTitle>
+        <CardDescription>
           Don't have an account?{" "}
-          <Link to="/register" className="text-sprout-400 hover:underline">
-            Register
-          </Link>
-        </>
-      }
-    >
+          <Button variant="link" asChild>
+            <Link to="/register">Register</Link>
+          </Button>
+        </CardDescription>
+      </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <FieldGroup>
           <CardContent>
@@ -84,14 +82,10 @@ function LoginPage() {
                 />
                 {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
               </Field>
+
+              {errors.root && <p className="text-xs text-destructive">{errors.root.message}</p>}
             </div>
           </CardContent>
-
-          {errors.root && (
-            <CardContent>
-              <p className="text-xs text-destructive">{errors.root.message}</p>
-            </CardContent>
-          )}
 
           <CardFooter>
             <Field>
@@ -102,6 +96,6 @@ function LoginPage() {
           </CardFooter>
         </FieldGroup>
       </form>
-    </SectionCard>
+    </Card>
   );
 }

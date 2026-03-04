@@ -25,24 +25,6 @@ export const getListings = createServerFn({
   return result;
 });
 
-export const getMyTrackedListings = createServerFn({
-  method: "GET",
-}).handler(async (): Promise<string[]> => {
-  const headers = getRequestHeaders();
-  const auth = createAuth(env);
-  const session = await auth.api.getSession({ headers });
-
-  if (!session) return [];
-
-  const db = createDb(env.DATABASE_URL);
-  const prefs = await db.query.userNotificationPreferences.findMany({
-    where: eq(userNotificationPreferences.userId, session.user.id),
-  });
-
-  return prefs.map((p) => p.listingId);
-});
-
-// Validator function for toggleTracking
 const toggleTrackingValidator = (input: unknown): { listingId: string } => {
   if (
     !input ||
@@ -84,6 +66,7 @@ export const toggleTracking = createServerFn({
       id: crypto.randomUUID(),
       userId: session.user.id,
       listingId: data.listingId,
+      notificationMode: "none",
     });
 
     return { tracked: true };

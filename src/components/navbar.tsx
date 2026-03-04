@@ -34,9 +34,14 @@ export function Navbar({ session }: NavbarProps) {
         </Link>
         <div className="flex items-center gap-2">
           {session ? (
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/profile">Profile</Link>
-            </Button>
+            <>
+              <Button variant="secondary" size="sm" asChild>
+                <Link to="/notifications">Notifications</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/profile">Profile</Link>
+              </Button>
+            </>
           ) : (
             <>
               <Button variant="outline" size="sm" asChild>

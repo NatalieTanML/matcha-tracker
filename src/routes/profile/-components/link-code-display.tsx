@@ -68,14 +68,11 @@ export function LinkInstructions({ botUsername, onGenerate, isGenerating }: Link
         <li className="flex gap-2">
           <span className="font-medium">2.</span>
           Start a new chat with{" "}
-          <a
-            href={`https://t.me/${botUsername}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sprout-400 hover:underline"
-          >
-            the Telegram bot
-          </a>
+          <Button variant="link" asChild>
+            <a href={`https://t.me/${botUsername}`} target="_blank" rel="noopener noreferrer">
+              the Telegram bot
+            </a>
+          </Button>
         </li>
         <li className="flex gap-2">
           <span className="font-medium">3.</span>
