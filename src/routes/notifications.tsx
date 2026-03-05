@@ -121,7 +121,7 @@ function NotificationsPage() {
               <Badge variant="outline">Not linked</Badge>
               <span className="text-sm text-muted-foreground">
                 Link your Telegram account in{" "}
-                <Link to="/profile" className="text-primary underline hover:no-underline">
+                <Link to="/profile" className="text-sprout-400 hover:underline">
                   Profile
                 </Link>{" "}
                 to receive notifications.

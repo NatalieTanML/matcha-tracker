@@ -1,5 +1,4 @@
-import { Copy01Icon, Link01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { CheckIcon, CopyIcon, LinkIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,10 +31,10 @@ export function LinkCodeDisplay({ code, expiresAt, onRegenerate, isRegenerating 
             <TooltipTrigger asChild>
               <button
                 onClick={handleCopy}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground opacity-50 outline-none ring-1 ring-transparent transition-all duration-200 hover:bg-background hover:opacity-100 hover:ring-border focus:opacity-100 focus:ring-border active:opacity-100"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground opacity-50 outline-none ring-1 ring-transparent transition-all duration-200 hover:opacity-100 hover:ring-border focus:opacity-100 focus:ring-border active:opacity-100"
                 title={copied ? "Copied!" : "Copy to clipboard"}
               >
-                <HugeiconsIcon icon={copied ? Tick01Icon : Copy01Icon} size={16} color="currentColor" />
+                {copied ? <CheckIcon size={16} color="currentColor" /> : <CopyIcon size={16} color="currentColor" />}
               </button>
             </TooltipTrigger>
             <TooltipContent sideOffset={4}>{copied ? "Copied!" : "Copy to clipboard"}</TooltipContent>
@@ -44,7 +43,7 @@ export function LinkCodeDisplay({ code, expiresAt, onRegenerate, isRegenerating 
         <p className="text-[0.625rem] text-muted-foreground">Expires at {expiresAt.toLocaleTimeString()}</p>
       </div>
       <Button variant="outline" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
-        <HugeiconsIcon icon={Link01Icon} size={16} className="mr-2" />
+        <LinkIcon size={16} className="m-1" data-icon="inline-start" />
         {isRegenerating ? "Regenerating..." : "Regenerate code"}
       </Button>
     </div>
@@ -67,12 +66,15 @@ export function LinkInstructions({ botUsername, onGenerate, isGenerating }: Link
         </li>
         <li className="flex gap-2">
           <span className="font-medium">2.</span>
-          Start a new chat with{" "}
-          <Button variant="link" asChild>
-            <a href={`https://t.me/${botUsername}`} target="_blank" rel="noopener noreferrer">
-              the Telegram bot
-            </a>
-          </Button>
+          Start a new chat with
+          <a
+            href={`https://t.me/${botUsername}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sprout-400 hover:underline"
+          >
+            the Telegram bot
+          </a>
         </li>
         <li className="flex gap-2">
           <span className="font-medium">3.</span>
@@ -80,7 +82,7 @@ export function LinkInstructions({ botUsername, onGenerate, isGenerating }: Link
         </li>
       </ol>
       <Button variant="default" size="sm" onClick={onGenerate} disabled={isGenerating}>
-        <HugeiconsIcon icon={Link01Icon} size={16} className="mr-2" />
+        <LinkIcon size={16} className="m-1" data-icon="inline-start" />
         {isGenerating ? "Generating..." : "Generate link code"}
       </Button>
     </div>
