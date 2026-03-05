@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   listingsQueryOptions,
-  myTrackedListingsQueryOptions,
+  myFavouritesQueryOptions,
   sessionQueryOptions,
   toggleTrackingMutationOptions,
 } from "@/lib/query-options";
@@ -67,7 +67,7 @@ function FilterSkeleton() {
 
 function App() {
   const { data: listings, isLoading: isLoadingListings } = useQuery(listingsQueryOptions);
-  const { data: trackedListings, isLoading: isLoadingTracked } = useQuery(myTrackedListingsQueryOptions);
+  const { data: trackedListings, isLoading: isLoadingTracked } = useQuery(myFavouritesQueryOptions);
   const { data: session } = useQuery(sessionQueryOptions);
   const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set());
   const [togglingId, setTogglingId] = useState<string | null>(null);

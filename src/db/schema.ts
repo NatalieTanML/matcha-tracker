@@ -1,7 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-
-export const notificationModeEnum = pgEnum("notification_mode", ["none", "individual", "grouped"]);
+import { boolean, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
 
 // ============================================================
 // Better Auth core tables
@@ -19,6 +17,7 @@ export const users = pgTable("users", {
   banExpires: timestamp("ban_expires", { mode: "date" }),
   // Custom fields
   telegramChatId: text("telegram_chat_id"),
+  includeOosInMessage: boolean("include_oos_in_message").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull(),
 });
@@ -136,18 +135,24 @@ export const stockHistory = pgTable("stock_history", {
   error: text("error"),
 });
 
-export const userNotificationPreferences = pgTable("user_notification_preferences", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  listingId: text("listing_id")
-    .notNull()
-    .references(() => listings.id, { onDelete: "cascade" }),
-  notificationMode: notificationModeEnum("notification_mode").default("none").notNull(),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
+// User favourites — a row existing means the user has favourited that listing.
+// enabled controls whether this listing is included in Telegram alert logic.
+export const userFavourites = pgTable(
+  "user_favourites",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => listings.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.userId, t.listingId)],
+);
 
 export const scrapeJobs = pgTable("scrape_jobs", {
   id: text("id").primaryKey(),
@@ -169,18 +174,24 @@ export const telegramLinkCodes = pgTable("telegram_link_codes", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-// Notification log
-export const notificationsSent = pgTable("notifications_sent", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  listingId: text("listing_id").references(() => listings.id, { onDelete: "cascade" }),
-  notificationMode: notificationModeEnum("notification_mode").notNull(),
-  inStock: boolean("in_stock").notNull(),
-  messageSent: text("message_sent").notNull(),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
+// Deduplication state for notifications — tracks the last message sent per user per storefront.
+// Used to avoid sending duplicate messages when stock state hasn't changed.
+export const notificationState = pgTable(
+  "notification_state",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    storefrontId: text("storefront_id")
+      .notNull()
+      .references(() => storefronts.id, { onDelete: "cascade" }),
+    // Sorted list of listing IDs that were in-stock in the last sent message
+    lastInStockListingIds: text("last_in_stock_listing_ids").array().default([]).notNull(),
+    sentAt: timestamp("sent_at", { mode: "date" }).notNull(),
+  },
+  (t) => [unique().on(t.userId, t.storefrontId)],
+);
 
 // ============================================================
 // Relations
@@ -189,8 +200,9 @@ export const notificationsSent = pgTable("notifications_sent", {
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   accounts: many(accounts),
-  notificationPreferences: many(userNotificationPreferences),
+  favourites: many(userFavourites),
   telegramLinkCodes: many(telegramLinkCodes),
+  notificationStates: many(notificationState),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -204,6 +216,7 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 export const storefrontsRelations = relations(storefronts, ({ many }) => ({
   listings: many(listings),
   brands: many(storefrontsBrands),
+  notificationStates: many(notificationState),
 }));
 
 export const brandsRelations = relations(brands, ({ many }) => ({
@@ -231,25 +244,25 @@ export const listingsRelations = relations(listings, ({ one, many }) => ({
   matcha: one(matchas, { fields: [listings.matchaId], references: [matchas.id] }),
   storefront: one(storefronts, { fields: [listings.storefrontId], references: [storefronts.id] }),
   stockHistory: many(stockHistory),
-  userPreferences: many(userNotificationPreferences),
+  favourites: many(userFavourites),
 }));
 
 export const stockHistoryRelations = relations(stockHistory, ({ one }) => ({
   listing: one(listings, { fields: [stockHistory.listingId], references: [listings.id] }),
 }));
 
-export const userNotificationPreferencesRelations = relations(userNotificationPreferences, ({ one }) => ({
-  user: one(users, { fields: [userNotificationPreferences.userId], references: [users.id] }),
-  listing: one(listings, { fields: [userNotificationPreferences.listingId], references: [listings.id] }),
+export const userFavouritesRelations = relations(userFavourites, ({ one }) => ({
+  user: one(users, { fields: [userFavourites.userId], references: [users.id] }),
+  listing: one(listings, { fields: [userFavourites.listingId], references: [listings.id] }),
 }));
 
 export const telegramLinkCodesRelations = relations(telegramLinkCodes, ({ one }) => ({
   user: one(users, { fields: [telegramLinkCodes.userId], references: [users.id] }),
 }));
 
-export const notificationsSentRelations = relations(notificationsSent, ({ one }) => ({
-  user: one(users, { fields: [notificationsSent.userId], references: [users.id] }),
-  listing: one(listings, { fields: [notificationsSent.listingId], references: [listings.id] }),
+export const notificationStateRelations = relations(notificationState, ({ one }) => ({
+  user: one(users, { fields: [notificationState.userId], references: [users.id] }),
+  storefront: one(storefronts, { fields: [notificationState.storefrontId], references: [storefronts.id] }),
 }));
 
 // ============================================================
@@ -264,9 +277,8 @@ export type Brand = typeof brands.$inferSelect;
 export type Matcha = typeof matchas.$inferSelect;
 export type Listing = typeof listings.$inferSelect;
 export type StockHistory = typeof stockHistory.$inferSelect;
-export type UserNotificationPreference = typeof userNotificationPreferences.$inferSelect;
+export type UserFavourite = typeof userFavourites.$inferSelect;
 export type ScrapeJob = typeof scrapeJobs.$inferSelect;
 export type StorefrontsBrands = typeof storefrontsBrands.$inferSelect;
 export type TelegramLinkCode = typeof telegramLinkCodes.$inferSelect;
-export type NotificationsSent = typeof notificationsSent.$inferSelect;
-export type NotificationMode = typeof notificationModeEnum.enumValues;
+export type NotificationState = typeof notificationState.$inferSelect;

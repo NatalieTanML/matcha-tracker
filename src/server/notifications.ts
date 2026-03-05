@@ -3,10 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { and, eq } from "drizzle-orm";
 import { createDb } from "@/db";
-import { userNotificationPreferences } from "@/db/schema";
+import { notificationState, userFavourites, users } from "@/db/schema";
 import { createAuth } from "@/lib/auth";
 
-export const getMyTrackedListings = createServerFn({
+export const getMyFavourites = createServerFn({
   method: "GET",
 }).handler(async () => {
   const headers = getRequestHeaders();
@@ -16,8 +16,8 @@ export const getMyTrackedListings = createServerFn({
   if (!session) return [];
 
   const db = createDb(env.DATABASE_URL);
-  const prefs = await db.query.userNotificationPreferences.findMany({
-    where: eq(userNotificationPreferences.userId, session.user.id),
+  const favs = await db.query.userFavourites.findMany({
+    where: eq(userFavourites.userId, session.user.id),
     with: {
       listing: {
         with: {
@@ -28,37 +28,30 @@ export const getMyTrackedListings = createServerFn({
     },
   });
 
-  return prefs.map((p) => ({
-    preferenceId: p.id,
-    listingId: p.listingId,
-    notificationMode: p.notificationMode,
-    listing: p.listing,
+  return favs.map((f) => ({
+    favouriteId: f.id,
+    listingId: f.listingId,
+    enabled: f.enabled,
+    listing: f.listing,
   }));
 });
 
-const updateNotificationModeValidator = (
-  input: unknown,
-): { listingId: string; notificationMode: "none" | "individual" | "grouped" } => {
+const toggleFavouriteEnabledValidator = (input: unknown): { listingId: string } => {
   if (
     !input ||
     typeof input !== "object" ||
     !("listingId" in input) ||
-    !("notificationMode" in input) ||
     typeof (input as { listingId: unknown }).listingId !== "string"
   ) {
-    throw new Error("listingId and notificationMode are required");
+    throw new Error("listingId is required");
   }
-  const mode = (input as { notificationMode: unknown }).notificationMode;
-  if (mode !== "none" && mode !== "individual" && mode !== "grouped") {
-    throw new Error("notificationMode must be 'none', 'individual', or 'grouped'");
-  }
-  return input as { listingId: string; notificationMode: "none" | "individual" | "grouped" };
+  return input as { listingId: string };
 };
 
-export const updateNotificationMode = createServerFn({
+export const toggleFavouriteEnabled = createServerFn({
   method: "POST",
 })
-  .inputValidator(updateNotificationModeValidator)
+  .inputValidator(toggleFavouriteEnabledValidator)
   .handler(async ({ data }) => {
     const headers = getRequestHeaders();
     const auth = createAuth(env);
@@ -68,26 +61,70 @@ export const updateNotificationMode = createServerFn({
 
     const db = createDb(env.DATABASE_URL);
 
-    const existing = await db.query.userNotificationPreferences.findFirst({
-      where: and(
-        eq(userNotificationPreferences.userId, session.user.id),
-        eq(userNotificationPreferences.listingId, data.listingId),
-      ),
+    const existing = await db.query.userFavourites.findFirst({
+      where: and(eq(userFavourites.userId, session.user.id), eq(userFavourites.listingId, data.listingId)),
     });
 
-    if (existing) {
-      await db
-        .update(userNotificationPreferences)
-        .set({ notificationMode: data.notificationMode, updatedAt: new Date() })
-        .where(eq(userNotificationPreferences.id, existing.id));
-    } else {
-      await db.insert(userNotificationPreferences).values({
-        id: crypto.randomUUID(),
-        userId: session.user.id,
-        listingId: data.listingId,
-        notificationMode: data.notificationMode,
-      });
-    }
+    if (!existing) throw new Error("Favourite not found");
+
+    await db
+      .update(userFavourites)
+      .set({ enabled: !existing.enabled, updatedAt: new Date() })
+      .where(eq(userFavourites.id, existing.id));
+
+    return { enabled: !existing.enabled };
+  });
+
+export const getNotificationSettings = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const headers = getRequestHeaders();
+  const auth = createAuth(env);
+  const session = await auth.api.getSession({ headers });
+
+  if (!session) throw new Error("Unauthorized");
+
+  const db = createDb(env.DATABASE_URL);
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.user.id),
+  });
+
+  return { includeOosInMessage: user?.includeOosInMessage ?? false };
+});
+
+const updateNotificationSettingsValidator = (input: unknown): { includeOosInMessage: boolean } => {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    !("includeOosInMessage" in input) ||
+    typeof (input as { includeOosInMessage: unknown }).includeOosInMessage !== "boolean"
+  ) {
+    throw new Error("includeOosInMessage (boolean) is required");
+  }
+  return input as { includeOosInMessage: boolean };
+};
+
+export const updateNotificationSettings = createServerFn({
+  method: "POST",
+})
+  .inputValidator(updateNotificationSettingsValidator)
+  .handler(async ({ data }) => {
+    const headers = getRequestHeaders();
+    const auth = createAuth(env);
+    const session = await auth.api.getSession({ headers });
+
+    if (!session) throw new Error("Unauthorized");
+
+    const db = createDb(env.DATABASE_URL);
+
+    await db
+      .update(users)
+      .set({ includeOosInMessage: data.includeOosInMessage, updatedAt: new Date() })
+      .where(eq(users.id, session.user.id));
+
+    // Clear notification state for this user so the next scrape sends a fresh message
+    // reflecting the updated OOS preference
+    await db.delete(notificationState).where(eq(notificationState.userId, session.user.id));
 
     return { success: true };
   });

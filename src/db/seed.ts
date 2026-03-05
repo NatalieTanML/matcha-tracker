@@ -1,15 +1,7 @@
 import "dotenv/config";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import {
-  brands,
-  listings,
-  matchas,
-  stockHistory,
-  storefronts,
-  storefrontsBrands,
-  userNotificationPreferences,
-} from "@/db/schema";
+import { brands, listings, matchas, stockHistory, storefronts, storefrontsBrands } from "@/db/schema";
 
 const storefrontsData = [
   { name: "Sazen Tea", url: "https://www.sazentea.com" },
@@ -1045,7 +1037,6 @@ async function main() {
   const db = getDb();
 
   // Clear existing data in reverse dependency order
-  await db.delete(userNotificationPreferences);
   await db.delete(stockHistory);
   await db.delete(listings);
   await db.delete(matchas);

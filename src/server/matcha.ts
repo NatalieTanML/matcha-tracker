@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { and, desc, eq } from "drizzle-orm";
 import { createDb } from "@/db";
-import { listings, userNotificationPreferences } from "@/db/schema";
+import { listings, userFavourites } from "@/db/schema";
 import { createAuth } from "@/lib/auth";
 
 export const getListings = createServerFn({
@@ -50,23 +50,20 @@ export const toggleTracking = createServerFn({
 
     const db = createDb(env.DATABASE_URL);
 
-    const existing = await db.query.userNotificationPreferences.findFirst({
-      where: and(
-        eq(userNotificationPreferences.userId, session.user.id),
-        eq(userNotificationPreferences.listingId, data.listingId),
-      ),
+    const existing = await db.query.userFavourites.findFirst({
+      where: and(eq(userFavourites.userId, session.user.id), eq(userFavourites.listingId, data.listingId)),
     });
 
     if (existing) {
-      await db.delete(userNotificationPreferences).where(eq(userNotificationPreferences.id, existing.id));
+      await db.delete(userFavourites).where(eq(userFavourites.id, existing.id));
       return { tracked: false };
     }
 
-    await db.insert(userNotificationPreferences).values({
+    await db.insert(userFavourites).values({
       id: crypto.randomUUID(),
       userId: session.user.id,
       listingId: data.listingId,
-      notificationMode: "none",
+      enabled: true,
     });
 
     return { tracked: true };

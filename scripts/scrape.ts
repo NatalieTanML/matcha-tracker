@@ -1,8 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { parse } from "node-html-parser";
 import PQueue from "p-queue";
 import { createDb } from "../src/db";
-import { listings, notificationsSent, scrapeJobs, stockHistory, userNotificationPreferences, users } from "../src/db/schema";
+import {
+  listings,
+  notificationState,
+  scrapeJobs,
+  stockHistory,
+  userFavourites,
+  users,
+} from "../src/db/schema";
 
 const CONCURRENCY_LIMIT = 5;
 const SAZEN_CONCURRENCY = 3;
@@ -12,7 +19,9 @@ interface Listing {
   url: string;
   price: string | null;
   lastStock: boolean | null;
+  storefrontId: string;
   storefront: {
+    id: string;
     name: string;
     url: string;
   };
@@ -46,130 +55,156 @@ async function sendTelegramMessage(botToken: string, chatId: string, text: strin
   }
 }
 
-interface WatcherInfo {
-  userId: string;
-  telegramChatId: string | null;
-  notificationMode: "none" | "individual" | "grouped";
-}
-
-interface GroupedNotification {
-  userId: string;
-  telegramChatId: string;
-  inStockItems: string[];
-  outOfStockItems: string[];
-}
-
-async function notifyUsers(
+/**
+ * After all stock data is collected, send per-storefront Telegram notifications.
+ *
+ * Logic:
+ * - For each user with ≥1 enabled favourite, grouped by storefront:
+ *   - inStockNow  = their enabled favourites for this storefront that are currently in stock
+ *   - lastSentIds = the listing IDs that were in stock in the last message we sent (from notification_state)
+ *   - newInStock  = inStockNow whose IDs are NOT in lastSentIds
+ *   - If newInStock is empty → skip (no newly in-stock items)
+ *   - Otherwise → send message, upsert notification_state
+ *
+ * The user-level option `includeOosInMessage` controls whether OOS favourites are appended.
+ * When that option is toggled, we clear notification_state rows for that user (done in the server fn),
+ * so the next scrape sends a fresh message.
+ */
+async function sendNotifications(
   db: ReturnType<typeof createDb>,
-  listing: Listing,
-  inStock: boolean,
-  botToken: string | undefined,
-  groupedNotifications: Map<string, GroupedNotification>
+  allListings: Listing[],
+  currentStockMap: Map<string, boolean>, // listingId → inStock
+  botToken: string,
 ) {
-  if (!botToken) return;
+  // Build a map of listingId → listing for quick lookup
+  const listingMap = new Map<string, Listing>();
+  for (const l of allListings) {
+    listingMap.set(l.id, l);
+  }
 
-  const watchers: WatcherInfo[] = await db
+  // Fetch all users who have at least one enabled favourite and have a telegram chat id
+  const usersWithFavourites = await db
     .select({
-      userId: userNotificationPreferences.userId,
+      userId: userFavourites.userId,
       telegramChatId: users.telegramChatId,
-      notificationMode: userNotificationPreferences.notificationMode,
+      includeOos: users.includeOosInMessage,
     })
-    .from(userNotificationPreferences)
-    .innerJoin(users, eq(userNotificationPreferences.userId, users.id))
-    .where(eq(userNotificationPreferences.listingId, listing.id));
+    .from(userFavourites)
+    .innerJoin(users, eq(userFavourites.userId, users.id))
+    .where(eq(userFavourites.enabled, true))
+    .groupBy(userFavourites.userId, users.telegramChatId, users.includeOosInMessage);
 
-  const status = inStock ? "🟢 IN STOCK" : "🔴 OUT OF STOCK";
-  const message = `${status}: ${listing.matcha.brand.name} - ${listing.matcha.name}\n${listing.storefront.name}`;
+  // De-duplicate users (groupBy returns one row per user)
+  const uniqueUsers = new Map<
+    string,
+    { userId: string; telegramChatId: string | null; includeOos: boolean }
+  >();
+  for (const row of usersWithFavourites) {
+    if (!uniqueUsers.has(row.userId)) {
+      uniqueUsers.set(row.userId, row);
+    }
+  }
 
-  for (const watcher of watchers) {
-    if (!watcher.telegramChatId) continue;
+  for (const { userId, telegramChatId, includeOos } of uniqueUsers.values()) {
+    if (!telegramChatId) continue;
 
-    if (watcher.notificationMode === "individual") {
-      await sendTelegramMessage(botToken, watcher.telegramChatId, message);
-      await db.insert(notificationsSent).values({
-        id: crypto.randomUUID(),
-        userId: watcher.userId,
-        listingId: listing.id,
-        notificationMode: "individual",
-        inStock,
-        messageSent: message,
+    // Fetch all enabled favourites for this user
+    const favs = await db
+      .select({
+        listingId: userFavourites.listingId,
+        storefrontId: listings.storefrontId,
+      })
+      .from(userFavourites)
+      .innerJoin(listings, eq(userFavourites.listingId, listings.id))
+      .where(and(eq(userFavourites.userId, userId), eq(userFavourites.enabled, true)));
+
+    // Group favourites by storefront
+    const byStorefront = new Map<string, string[]>(); // storefrontId → listingIds
+    for (const fav of favs) {
+      if (!byStorefront.has(fav.storefrontId)) {
+        byStorefront.set(fav.storefrontId, []);
+      }
+      byStorefront.get(fav.storefrontId)!.push(fav.listingId);
+    }
+
+    for (const [storefrontId, listingIds] of byStorefront) {
+      // Partition into in-stock / OOS based on current scrape data
+      const inStockNow = listingIds.filter((id) => currentStockMap.get(id) === true);
+      const oosNow = listingIds.filter((id) => currentStockMap.get(id) !== true);
+
+      // Sort for stable comparison
+      const inStockNowSorted = [...inStockNow].sort();
+
+      if (inStockNowSorted.length === 0) {
+        // Nothing in stock for this storefront → no message
+        continue;
+      }
+
+      // Fetch last notification state for this user+storefront
+      const state = await db.query.notificationState.findFirst({
+        where: and(
+          eq(notificationState.userId, userId),
+          eq(notificationState.storefrontId, storefrontId),
+        ),
       });
-    } else if (watcher.notificationMode === "grouped") {
-      if (!groupedNotifications.has(watcher.userId)) {
-        groupedNotifications.set(watcher.userId, {
-          userId: watcher.userId,
-          telegramChatId: watcher.telegramChatId,
-          inStockItems: [],
-          outOfStockItems: [],
+
+      const lastSentIds = state?.lastInStockListingIds ?? [];
+      const lastSentSet = new Set(lastSentIds);
+
+      // New items = currently in stock that were NOT in the last sent message
+      const newInStock = inStockNowSorted.filter((id) => !lastSentSet.has(id));
+
+      if (newInStock.length === 0) {
+        // No new items came into stock → skip
+        continue;
+      }
+
+      // Look up the storefront name from the first listing
+      const storefrontName = listingMap.get(listingIds[0])?.storefront.name ?? storefrontId;
+
+      // Build the message
+      let message = `<b>${storefrontName} — Stock Update</b>\n\n`;
+
+      message += "✅ <b>In Stock:</b>\n";
+      for (const id of inStockNowSorted) {
+        const l = listingMap.get(id);
+        if (l) {
+          message += `  • ${l.matcha.brand.name} – ${l.matcha.name}\n`;
+        }
+      }
+
+      if (includeOos && oosNow.length > 0) {
+        message += "\n❌ <b>Out of Stock:</b>\n";
+        for (const id of oosNow) {
+          const l = listingMap.get(id);
+          if (l) {
+            message += `  • ${l.matcha.brand.name} – ${l.matcha.name}\n`;
+          }
+        }
+      }
+
+      await sendTelegramMessage(botToken, telegramChatId, message.trim());
+
+      // Upsert notification_state
+      if (state) {
+        await db
+          .update(notificationState)
+          .set({ lastInStockListingIds: inStockNowSorted, sentAt: new Date() })
+          .where(eq(notificationState.id, state.id));
+      } else {
+        await db.insert(notificationState).values({
+          id: crypto.randomUUID(),
+          userId,
+          storefrontId,
+          lastInStockListingIds: inStockNowSorted,
+          sentAt: new Date(),
         });
       }
-      const grouped = groupedNotifications.get(watcher.userId)!;
-      if (inStock) {
-        grouped.inStockItems.push(`${listing.matcha.brand.name} - ${listing.matcha.name}`);
-      } else {
-        grouped.outOfStockItems.push(`${listing.matcha.brand.name} - ${listing.matcha.name}`);
-      }
+
+      console.log(
+        `  📱 Sent notification to user ${userId} for storefront ${storefrontName}: ${newInStock.length} new in-stock item(s)`,
+      );
     }
-  }
-
-  const activeWatchers = watchers.filter((w) => w.notificationMode !== "none");
-  if (activeWatchers.length > 0) {
-    console.log(`  📱 Notified ${activeWatchers.length} user(s) about ${listing.matcha.name}`);
-  }
-}
-
-async function sendGroupedNotifications(
-  db: ReturnType<typeof createDb>,
-  groupedNotifications: Map<string, GroupedNotification>,
-  botToken: string
-) {
-  for (const grouped of groupedNotifications.values()) {
-    if (grouped.inStockItems.length === 0 && grouped.outOfStockItems.length === 0) continue;
-
-    let message = "📢 <b>Stock Update</b>\n\n";
-
-    if (grouped.inStockItems.length > 0) {
-      message += "🟢 <b>Back in Stock:</b>\n";
-      for (const item of grouped.inStockItems) {
-        message += `  • ${item}\n`;
-      }
-      message += "\n";
-    }
-
-    if (grouped.outOfStockItems.length > 0) {
-      message += "🔴 <b>Out of Stock:</b>\n";
-      for (const item of grouped.outOfStockItems) {
-        message += `  • ${item}\n`;
-      }
-    }
-
-    await sendTelegramMessage(botToken, grouped.telegramChatId, message);
-
-    for (const item of grouped.inStockItems) {
-      await db.insert(notificationsSent).values({
-        id: crypto.randomUUID(),
-        userId: grouped.userId,
-        listingId: null,
-        notificationMode: "grouped",
-        inStock: true,
-        messageSent: item,
-      });
-    }
-
-    for (const item of grouped.outOfStockItems) {
-      await db.insert(notificationsSent).values({
-        id: crypto.randomUUID(),
-        userId: grouped.userId,
-        listingId: null,
-        notificationMode: "grouped",
-        inStock: false,
-        messageSent: item,
-      });
-    }
-  }
-
-  if (groupedNotifications.size > 0) {
-    console.log(`  📱 Sent grouped notifications to ${groupedNotifications.size} user(s)`);
   }
 }
 
@@ -183,8 +218,6 @@ async function main() {
 
   const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
   const db = createDb(databaseUrl);
-
-  const groupedNotifications = new Map<string, GroupedNotification>();
 
   const [scrapeJob] = await db
     .insert(scrapeJobs)
@@ -218,13 +251,16 @@ async function main() {
   }
 
   console.log("\n📊 Storefront breakdown:");
-  for (const [name, listings] of listingsByStorefront) {
-    console.log(`  - ${name}: ${listings.length} listings`);
+  for (const [name, sfListings] of listingsByStorefront) {
+    console.log(`  - ${name}: ${sfListings.length} listings`);
   }
 
   let listingsChecked = 0;
   let listingsChanged = 0;
   const errors: string[] = [];
+
+  // Track current stock state after scrape (used for notifications)
+  const currentStockMap = new Map<string, boolean>(); // listingId → inStock
 
   console.log(`\n🚀 Processing ${listingsByStorefront.size} storefronts in parallel...`);
 
@@ -234,24 +270,18 @@ async function main() {
       const concurrency = isSazen ? SAZEN_CONCURRENCY : CONCURRENCY_LIMIT;
 
       console.log(
-        `  [${storefrontName}] Starting ${storefrontListings.length} listings (concurrency: ${concurrency})...`
+        `  [${storefrontName}] Starting ${storefrontListings.length} listings (concurrency: ${concurrency})...`,
       );
 
       const startTime = Date.now();
-      const results = await processWithQueue(
-        storefrontListings,
-        db,
-        telegramBotToken,
-        concurrency,
-        groupedNotifications
-      );
+      const results = await processWithQueue(storefrontListings, db, concurrency);
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
       const changedCount = results.filter((r) => r.changed).length;
       const errorCount = results.filter((r) => r.error).length;
 
       console.log(
-        `  [${storefrontName}] ✓ Completed in ${duration}s: ${results.length} checked, ${changedCount} changed${errorCount > 0 ? `, ${errorCount} errors` : ""}`
+        `  [${storefrontName}] ✓ Completed in ${duration}s: ${results.length} checked, ${changedCount} changed${errorCount > 0 ? `, ${errorCount} errors` : ""}`,
       );
 
       const stockChanges = results.filter((r) => r.changed);
@@ -260,12 +290,19 @@ async function main() {
         console.log(`    ${status}: ${change.listing.matcha.brand.name} - ${change.listing.matcha.name}`);
       }
 
+      // Record current stock state for notification logic
+      for (const result of results) {
+        currentStockMap.set(result.listing.id, result.inStock);
+      }
+
       return {
         checked: results.length,
         changed: changedCount,
-        errors: results.filter((r) => r.error).map((r) => `${storefrontName} ${r.listing.id}: ${r.error}`),
+        errors: results
+          .filter((r) => r.error)
+          .map((r) => `${storefrontName} ${r.listing.id}: ${r.error}`),
       };
-    }
+    },
   );
 
   const results = await Promise.all(storefrontPromises);
@@ -276,8 +313,10 @@ async function main() {
     errors.push(...result.errors);
   }
 
+  // Send Telegram notifications now that we have the full stock picture
   if (telegramBotToken) {
-    await sendGroupedNotifications(db, groupedNotifications, telegramBotToken);
+    console.log("\n📲 Sending notifications...");
+    await sendNotifications(db, activeListings, currentStockMap, telegramBotToken);
   }
 
   await db
@@ -304,9 +343,7 @@ async function main() {
 async function processWithQueue(
   storefrontListings: Listing[],
   db: ReturnType<typeof createDb>,
-  botToken: string | undefined,
   concurrency: number,
-  groupedNotifications: Map<string, GroupedNotification>
 ): Promise<ProcessResult[]> {
   const queue = new PQueue({ concurrency });
 
@@ -327,9 +364,6 @@ async function processWithQueue(
             .update(listings)
             .set({ lastStock: inStock, lastChecked: new Date() })
             .where(eq(listings.id, listing.id));
-
-          // Send Telegram notifications
-          await notifyUsers(db, listing, inStock, botToken, groupedNotifications);
 
           return {
             listing,
@@ -361,7 +395,7 @@ async function processWithQueue(
           error: errorMsg,
         };
       }
-    })
+    }),
   );
 
   const settledResults = await Promise.allSettled(promises);
@@ -413,10 +447,7 @@ async function checkStock(listing: Listing): Promise<boolean> {
     return parseNakamuraStock(html);
   } else if (listing.url.includes("horiishichimeien")) {
     return parseHoriiStock(html);
-  } else if (
-    listing.url.includes("myshopify.com") ||
-    listing.url.includes("shopify")
-  ) {
+  } else if (listing.url.includes("myshopify.com") || listing.url.includes("shopify")) {
     return parseShopifyStock(html);
   }
 
@@ -468,7 +499,7 @@ function parseHoriiStock(html: string): boolean {
 function parseShopifyStock(html: string): boolean {
   const root = parse(html);
   const buttons = root.querySelectorAll(
-    'button[name="add"], button[type="submit"], button[class*="add-to-cart"], button[class*="AddToCart"]'
+    'button[name="add"], button[type="submit"], button[class*="add-to-cart"], button[class*="AddToCart"]',
   );
 
   for (const button of buttons) {
@@ -478,7 +509,11 @@ function parseShopifyStock(html: string): boolean {
     }
 
     const buttonText = button.text?.toLowerCase().trim() || "";
-    if (buttonText.includes("sold out") || buttonText.includes("out of stock") || buttonText.includes("unavailable")) {
+    if (
+      buttonText.includes("sold out") ||
+      buttonText.includes("out of stock") ||
+      buttonText.includes("unavailable")
+    ) {
       continue;
     }
 

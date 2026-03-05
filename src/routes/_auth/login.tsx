@@ -62,15 +62,15 @@ function LoginPage() {
         <CardTitle>Sign in</CardTitle>
         <CardDescription>
           Don't have an account?{" "}
-          <Button variant="link" asChild>
-            <Link to="/register">Register</Link>
-          </Button>
+          <Link to="/register" className="text-sprout-400 hover:underline">
+            Register
+          </Link>
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <FieldGroup>
           <CardContent>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input

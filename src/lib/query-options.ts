@@ -1,7 +1,12 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import { generateTelegramLinkCode, getSession, getTelegramStatus, unlinkTelegram } from "@/server/auth";
 import { getListings, toggleTracking } from "@/server/matcha";
-import { getMyTrackedListings, updateNotificationMode } from "@/server/notifications";
+import {
+  getMyFavourites,
+  getNotificationSettings,
+  toggleFavouriteEnabled,
+  updateNotificationSettings,
+} from "@/server/notifications";
 
 // Auth queries
 export const sessionQueryOptions = queryOptions({
@@ -34,18 +39,27 @@ export const listingsQueryOptions = queryOptions({
   gcTime: 5 * 60 * 1000,
 });
 
-export const myTrackedListingsQueryOptions = queryOptions({
-  queryKey: ["matcha", "tracked"],
-  queryFn: () => getMyTrackedListings(),
+export const myFavouritesQueryOptions = queryOptions({
+  queryKey: ["matcha", "favourites"],
+  queryFn: () => getMyFavourites(),
   staleTime: 60 * 1000,
   gcTime: 10 * 60 * 1000,
+});
+
+export const notificationSettingsQueryOptions = queryOptions({
+  queryKey: ["notifications", "settings"],
+  queryFn: () => getNotificationSettings(),
+  staleTime: 60 * 1000,
 });
 
 export const toggleTrackingMutationOptions = mutationOptions({
   mutationFn: (listingId: string) => toggleTracking({ data: { listingId } }),
 });
 
-export const updateNotificationModeMutationOptions = mutationOptions({
-  mutationFn: (data: { listingId: string; notificationMode: "none" | "individual" | "grouped" }) =>
-    updateNotificationMode({ data }),
+export const toggleFavouriteEnabledMutationOptions = mutationOptions({
+  mutationFn: (listingId: string) => toggleFavouriteEnabled({ data: { listingId } }),
+});
+
+export const updateNotificationSettingsMutationOptions = mutationOptions({
+  mutationFn: (data: { includeOosInMessage: boolean }) => updateNotificationSettings({ data }),
 });

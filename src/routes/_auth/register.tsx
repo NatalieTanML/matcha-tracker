@@ -64,15 +64,15 @@ function RegisterPage() {
         <CardTitle>Create an account</CardTitle>
         <CardDescription>
           Already have an account?{" "}
-          <Button variant="link" asChild>
-            <Link to="/login">Sign in</Link>
-          </Button>
+          <Link to="/login" className="text-sprout-400 hover:underline">
+            Sign in
+          </Link>
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <FieldGroup>
           <CardContent>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
               <Field>
                 <FieldLabel htmlFor="name">Name</FieldLabel>
                 <Input id="name" type="text" autoComplete="name" placeholder="Your name" {...register("name")} />
