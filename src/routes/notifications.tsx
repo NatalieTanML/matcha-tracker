@@ -102,7 +102,7 @@ function NotificationsPage() {
               <Badge variant="outline">Not linked</Badge>
               <span className="text-sm text-muted-foreground">
                 Link your Telegram account in{" "}
-                <Link to="/profile" className="text-sprout-400 hover:underline">
+                <Link to="/profile" className="text-sprout-400 underline-offset-4 hover:underline">
                   Profile
                 </Link>{" "}
                 to receive stock alerts.

@@ -62,7 +62,7 @@ function LoginPage() {
         <CardTitle>Sign in</CardTitle>
         <CardDescription>
           Don't have an account?{" "}
-          <Link to="/register" className="text-sprout-400 hover:underline">
+          <Link to="/register" className="text-sprout-400 underline-offset-4 hover:underline">
             Register
           </Link>
         </CardDescription>

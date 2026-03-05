@@ -71,7 +71,7 @@ export function LinkInstructions({ botUsername, onGenerate, isGenerating }: Link
             href={`https://t.me/${botUsername}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sprout-400 hover:underline"
+            className="text-sprout-400 underline-offset-4 hover:underline"
           >
             the Telegram bot
           </a>

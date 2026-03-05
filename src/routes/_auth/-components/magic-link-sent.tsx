@@ -16,7 +16,7 @@ export function MagicLinkSent({ description, onReset }: MagicLinkSentProps) {
       <CardContent>
         <p className="text-sm text-muted-foreground">
           Didn't receive it? Check your spam folder or{" "}
-          <button className="text-sprout-400 hover:underline" onClick={onReset}>
+          <button className="text-sprout-400 underline-offset-4 hover:underline" onClick={onReset}>
             try again
           </button>
           .

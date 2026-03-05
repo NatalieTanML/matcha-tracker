@@ -64,7 +64,7 @@ function RegisterPage() {
         <CardTitle>Create an account</CardTitle>
         <CardDescription>
           Already have an account?{" "}
-          <Link to="/login" className="text-sprout-400 hover:underline">
+          <Link to="/login" className="text-sprout-400 underline-offset-4 hover:underline">
             Sign in
           </Link>
         </CardDescription>
