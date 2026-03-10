@@ -3,6 +3,18 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist-mono";
 
+/* Performance optimizations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -176,5 +188,11 @@
 
   html {
     @apply font-mono;
+  }
+
+  /* Optimize rendering for long lists */
+  .grid > * {
+    content-visibility: auto;
+    contain-intrinsic-size: 400px;
   }
 }

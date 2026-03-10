@@ -14,6 +14,31 @@ const config = defineConfig({
     },
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Group TanStack libraries together
+          tanstack: ["@tanstack/react-query", "@tanstack/react-router", "@tanstack/react-table"],
+          // Group UI components together
+          "ui-components": [
+            "@/components/ui/button",
+            "@/components/ui/card",
+            "@/components/ui/badge",
+            "@/components/ui/skeleton",
+            "@/components/ui/select",
+            "@/components/ui/field",
+          ],
+          // Group auth-related code
+          auth: ["@/lib/auth-client", "@/lib/auth", "@/lib/query-options"],
+          // Group large dependencies
+          vendor: ["react-hook-form", "zod", "@hookform/resolvers", "date-fns"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 500,
+  },
+
   plugins: [
     devtools(),
     // this is the plugin that enables path aliases

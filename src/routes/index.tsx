@@ -1,8 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,32 +23,90 @@ export const Route = createFileRoute("/")({
 type SortOption = "lastChecked" | "storefront";
 type StockFilter = "all" | "inStock" | "outOfStock";
 
+function ListingCard({
+  listing,
+  isTracked,
+  isToggling,
+  onToggle,
+  formatLastChecked,
+}: {
+  listing: any;
+  isTracked: boolean;
+  isToggling: boolean;
+  onToggle: (id: string) => void;
+  formatLastChecked: (date: Date | null | undefined) => string;
+}) {
+  return (
+    <Card className="hover:shadow-lg transition-shadow group/card border ring-0" key={listing.id}>
+      {listing.matcha.imageUrl && (
+        <div className="px-4 pb-2">
+          <AspectRatio ratio={1} className="overflow-hidden rounded-md bg-muted">
+            <img
+              src={listing.matcha.imageUrl}
+              alt={listing.matcha.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          </AspectRatio>
+        </div>
+      )}
+      <CardContent className="space-y-2 grow">
+        <h2 className="text-md font-semibold">{listing.matcha.name}</h2>
+        <p className="text-sm text-muted-foreground">{listing.matcha.brand.name}</p>
+        <p className="text-sm text-muted-foreground">{listing.storefront.name}</p>
+        <p className="text-xs text-muted-foreground/70">Updated: {formatLastChecked(listing.lastChecked)}</p>
+        {listing.matcha.description && <p className="text-sm mt-2 line-clamp-3">{listing.matcha.description}</p>}
+      </CardContent>
+      <CardFooter className="justify-between">
+        <Badge variant={listing.lastStock ? "success" : "destructive"}>
+          {listing.lastStock ? "In Stock" : "Out of Stock"}
+        </Badge>
+        <div className="flex items-center gap-2">
+          {listing.price && <span className="text-sm text-muted-foreground">{listing.price}</span>}
+          <Button
+            variant={isTracked ? "default" : "outline"}
+            size="sm"
+            onClick={() => onToggle(listing.id)}
+            disabled={isToggling}
+            className={isToggling ? "opacity-50" : ""}
+          >
+            {isTracked ? "Tracked" : "Track"}
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+}
+
 function ListingCardSkeleton() {
   return (
-    <div className="border rounded-lg flex flex-col bg-card/80">
-      <div className="p-4 pb-2">
-        <Skeleton className="aspect-square w-full rounded-md" />
+    <Card className="group/card border ring-0">
+      <div className="px-4 pb-2">
+        <AspectRatio ratio={1} className="overflow-hidden rounded-md bg-muted">
+          <Skeleton className="w-full h-full" />
+        </AspectRatio>
       </div>
-      <div className="p-4 space-y-2">
+      <CardContent className="space-y-2">
         <Skeleton className="h-5 w-3/4" />
         <Skeleton className="h-4 w-1/2" />
         <Skeleton className="h-4 w-2/3" />
         <Skeleton className="h-3 w-1/3" />
         <Skeleton className="h-12 w-full mt-2" />
-      </div>
-      <div className="p-4 pt-2 mt-auto flex items-center justify-between">
+      </CardContent>
+      <CardFooter className="justify-between">
         <Skeleton className="h-6 w-20" />
         <Skeleton className="h-8 w-16" />
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }
 
 function FilterSkeleton() {
   return (
-    <div className="mb-6 p-4 bg-muted rounded-lg space-y-4 border">
-      <div className="flex flex-wrap gap-4 items-end">
-        <FieldGroup className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+    <Card className="mb-6 p-4 bg-muted border ring-0">
+      <div className="flex flex-wrap items-end">
+        <FieldGroup className="grid grid-cols-1 md:grid-cols-3 w-full">
           <Field>
             <Skeleton className="h-5 w-48 bg-card/80" />
             <Skeleton className="h-8 w-full rounded-md bg-card/80" />
@@ -61,7 +122,7 @@ function FilterSkeleton() {
         </FieldGroup>
       </div>
       <Skeleton className="h-4 w-48 bg-card/80" />
-    </div>
+    </Card>
   );
 }
 
@@ -204,9 +265,9 @@ function App() {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="mb-6 p-4 bg-muted rounded-lg space-y-4 border">
-        <div className="flex flex-wrap gap-4 items-end">
-          <FieldGroup className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card className="mb-6 p-4 bg-muted border ring-0">
+        <div className="flex flex-wrap items-end">
+          <FieldGroup className="grid grid-cols-1 md:grid-cols-3">
             <Field>
               <FieldLabel className="text-muted-foreground" htmlFor="sortBy">
                 Sort by
@@ -266,62 +327,30 @@ function App() {
         <div className="text-xs text-muted-foreground">
           Showing {filteredAndSortedListings.length} of {listings?.length ?? 0} listings
         </div>
-      </div>
+      </Card>
 
       {filteredAndSortedListings.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground space-y-2">
-          <p className="text-lg">No matcha items match your filters.</p>
-          <Button variant="link" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        </div>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No matcha items match your filters</EmptyTitle>
+            <EmptyDescription>
+              <Button variant="link" onClick={clearFilters} className="p-0 h-auto">
+                Clear filters
+              </Button>
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {filteredAndSortedListings.map((listing) => (
-            <div
+            <ListingCard
               key={listing.id}
-              className="border rounded-lg flex flex-col hover:shadow-lg transition-shadow bg-card/80"
-            >
-              {listing.matcha.imageUrl && (
-                <div className="p-4 pb-2">
-                  <div className="aspect-square overflow-hidden rounded-md bg-muted">
-                    <img
-                      src={listing.matcha.imageUrl}
-                      alt={listing.matcha.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="p-4 space-y-1">
-                <h2 className="text-md font-semibold">{listing.matcha.name}</h2>
-                <p className="text-sm text-muted-foreground">{listing.matcha.brand.name}</p>
-                <p className="text-sm text-muted-foreground">{listing.storefront.name}</p>
-                <p className="text-xs text-muted-foreground/70">Updated: {formatLastChecked(listing.lastChecked)}</p>
-                {listing.matcha.description && (
-                  <p className="text-sm mt-2 line-clamp-3">{listing.matcha.description}</p>
-                )}
-              </div>
-              <div className="p-4 pt-2 mt-auto flex items-center justify-between">
-                <Badge variant={listing.lastStock ? "success" : "destructive"}>
-                  {listing.lastStock ? "In Stock" : "Out of Stock"}
-                </Badge>
-                <div className="flex items-center gap-2">
-                  {listing.price && <span className="text-sm text-muted-foreground">{listing.price}</span>}
-                  {session && (
-                    <Button
-                      variant={trackedIds.has(listing.id) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handleToggleTracking(listing.id)}
-                      disabled={togglingId !== null}
-                      className={togglingId === listing.id ? "opacity-50" : ""}
-                    >
-                      {trackedIds.has(listing.id) ? "Tracked" : "Track"}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
+              listing={listing}
+              isTracked={trackedIds.has(listing.id)}
+              isToggling={togglingId === listing.id}
+              onToggle={handleToggleTracking}
+              formatLastChecked={formatLastChecked}
+            />
           ))}
         </div>
       )}

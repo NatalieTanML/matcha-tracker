@@ -36,7 +36,7 @@ export function Navbar({ session }: NavbarProps) {
           {session ? (
             <>
               <Button variant="secondary" size="sm" asChild>
-                <Link to="/notifications">Notifications</Link>
+                <Link to="/my-favourites">My Favourites</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/profile">Profile</Link>

@@ -10,7 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as MyFavouritesRouteImport } from './routes/my-favourites'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
@@ -23,9 +23,9 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
-const NotificationsRoute = NotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
+const MyFavouritesRoute = MyFavouritesRouteImport.update({
+  id: '/my-favourites',
+  path: '/my-favourites',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -60,7 +60,7 @@ const AuthMagicLinkVerifyRoute = AuthMagicLinkVerifyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/notifications': typeof NotificationsRoute
+  '/my-favourites': typeof MyFavouritesRoute
   '/profile': typeof ProfileRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
@@ -69,7 +69,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/notifications': typeof NotificationsRoute
+  '/my-favourites': typeof MyFavouritesRoute
   '/profile': typeof ProfileRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
@@ -80,7 +80,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
-  '/notifications': typeof NotificationsRoute
+  '/my-favourites': typeof MyFavouritesRoute
   '/profile': typeof ProfileRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
@@ -91,7 +91,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/notifications'
+    | '/my-favourites'
     | '/profile'
     | '/login'
     | '/register'
@@ -100,7 +100,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/notifications'
+    | '/my-favourites'
     | '/profile'
     | '/login'
     | '/register'
@@ -110,7 +110,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_auth'
-    | '/notifications'
+    | '/my-favourites'
     | '/profile'
     | '/_auth/login'
     | '/_auth/register'
@@ -121,7 +121,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
-  NotificationsRoute: typeof NotificationsRoute
+  MyFavouritesRoute: typeof MyFavouritesRoute
   ProfileRoute: typeof ProfileRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -135,11 +135,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/notifications': {
-      id: '/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof NotificationsRouteImport
+    '/my-favourites': {
+      id: '/my-favourites'
+      path: '/my-favourites'
+      fullPath: '/my-favourites'
+      preLoaderRoute: typeof MyFavouritesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth': {
@@ -204,7 +204,7 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
-  NotificationsRoute: NotificationsRoute,
+  MyFavouritesRoute: MyFavouritesRoute,
   ProfileRoute: ProfileRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
