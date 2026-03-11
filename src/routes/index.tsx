@@ -1,3 +1,4 @@
+import { HeartIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -26,8 +27,8 @@ type StockFilter = "all" | "inStock" | "outOfStock";
 function ListingCard({
   listing,
   isTracked,
-  isToggling,
   onToggle,
+  isToggling,
   formatLastChecked,
 }: {
   listing: any;
@@ -58,20 +59,25 @@ function ListingCard({
         <p className="text-xs text-muted-foreground/70">Updated: {formatLastChecked(listing.lastChecked)}</p>
         {listing.matcha.description && <p className="text-sm mt-2 line-clamp-3">{listing.matcha.description}</p>}
       </CardContent>
-      <CardFooter className="justify-between">
+      <CardFooter className="justify-between mt-auto">
         <Badge variant={listing.lastStock ? "success" : "destructive"}>
           {listing.lastStock ? "In Stock" : "Out of Stock"}
         </Badge>
         <div className="flex items-center gap-2">
-          {listing.price && <span className="text-sm text-muted-foreground">{listing.price}</span>}
           <Button
-            variant={isTracked ? "default" : "outline"}
-            size="sm"
+            variant="ghost"
+            size="icon"
             onClick={() => onToggle(listing.id)}
             disabled={isToggling}
-            className={isToggling ? "opacity-50" : ""}
+            className={
+              isToggling
+                ? "opacity-50"
+                : isTracked
+                  ? "text-destructive hover:text-gray-500"
+                  : "text-muted-foreground hover:text-destructive"
+            }
           >
-            {isTracked ? "Tracked" : "Track"}
+            <HeartIcon size={20} weight={isTracked ? "fill" : "regular"} />
           </Button>
         </div>
       </CardFooter>
@@ -105,22 +111,20 @@ function ListingCardSkeleton() {
 function FilterSkeleton() {
   return (
     <Card className="mb-6 p-4 bg-muted border ring-0">
-      <div className="flex flex-wrap items-end">
-        <FieldGroup className="grid grid-cols-1 md:grid-cols-3 w-full">
-          <Field>
-            <Skeleton className="h-5 w-48 bg-card/80" />
-            <Skeleton className="h-8 w-full rounded-md bg-card/80" />
-          </Field>
-          <Field>
-            <Skeleton className="h-5 w-48 bg-card/80" />
-            <Skeleton className="h-8 w-full rounded-md bg-card/80" />
-          </Field>
-          <Field>
-            <Skeleton className="h-5 w-48 bg-card/80" />
-            <Skeleton className="h-8 w-full rounded-md bg-card/80" />
-          </Field>
-        </FieldGroup>
-      </div>
+      <FieldGroup className="grid grid-cols-1 md:grid-cols-3 w-full">
+        <Field>
+          <Skeleton className="h-5 w-48 bg-card/80" />
+          <Skeleton className="h-8 w-full rounded-md bg-card/80" />
+        </Field>
+        <Field>
+          <Skeleton className="h-5 w-48 bg-card/80" />
+          <Skeleton className="h-8 w-full rounded-md bg-card/80" />
+        </Field>
+        <Field>
+          <Skeleton className="h-5 w-48 bg-card/80" />
+          <Skeleton className="h-8 w-full rounded-md bg-card/80" />
+        </Field>
+      </FieldGroup>
       <Skeleton className="h-4 w-48 bg-card/80" />
     </Card>
   );
@@ -266,63 +270,61 @@ function App() {
   return (
     <div className="container mx-auto p-4">
       <Card className="mb-6 p-4 bg-muted border ring-0">
-        <div className="flex flex-wrap items-end">
-          <FieldGroup className="grid grid-cols-1 md:grid-cols-3">
-            <Field>
-              <FieldLabel className="text-muted-foreground" htmlFor="sortBy">
-                Sort by
-              </FieldLabel>
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                <SelectTrigger className="bg-card/80">
-                  <SelectValue id="sortBy" />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    <SelectItem value="lastChecked">Last updated</SelectItem>
-                    <SelectItem value="storefront">Storefront name</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel className="text-muted-foreground" htmlFor="storefront">
-                Storefront
-              </FieldLabel>
-              <Select value={selectedStorefront} onValueChange={setSelectedStorefront}>
-                <SelectTrigger className="bg-card/80">
-                  <SelectValue id="storefront" />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    <SelectItem value="all">All Storefronts</SelectItem>
-                    {storefronts.map((storefront) => (
-                      <SelectItem key={storefront} value={storefront}>
-                        {storefront}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel className="text-muted-foreground" htmlFor="stockStatus">
-                Stock status
-              </FieldLabel>
-              <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
-                <SelectTrigger className="bg-card/80">
-                  <SelectValue id="stockStatus" />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="inStock">In stock</SelectItem>
-                    <SelectItem value="outOfStock">Out of stock</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          </FieldGroup>
-        </div>
+        <FieldGroup className="grid grid-cols-1 md:grid-cols-3">
+          <Field>
+            <FieldLabel className="text-muted-foreground" htmlFor="sortBy">
+              Sort by
+            </FieldLabel>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+              <SelectTrigger className="bg-card/80">
+                <SelectValue id="sortBy" />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem value="lastChecked">Last updated</SelectItem>
+                  <SelectItem value="storefront">Storefront name</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel className="text-muted-foreground" htmlFor="storefront">
+              Storefront
+            </FieldLabel>
+            <Select value={selectedStorefront} onValueChange={setSelectedStorefront}>
+              <SelectTrigger className="bg-card/80">
+                <SelectValue id="storefront" />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem value="all">All Storefronts</SelectItem>
+                  {storefronts.map((storefront) => (
+                    <SelectItem key={storefront} value={storefront}>
+                      {storefront}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel className="text-muted-foreground" htmlFor="stockStatus">
+              Stock status
+            </FieldLabel>
+            <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
+              <SelectTrigger className="bg-card/80">
+                <SelectValue id="stockStatus" />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="inStock">In stock</SelectItem>
+                  <SelectItem value="outOfStock">Out of stock</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
 
         <div className="text-xs text-muted-foreground">
           Showing {filteredAndSortedListings.length} of {listings?.length ?? 0} listings

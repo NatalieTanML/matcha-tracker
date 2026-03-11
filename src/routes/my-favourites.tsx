@@ -1,13 +1,14 @@
 import { TrashIcon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
-import { Empty } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/my-favourites")({
   beforeLoad: async ({ context }) => {
     const session = await context.queryClient.fetchQuery(sessionQueryOptions);
     if (!session) {
-      throw new Error("Unauthorized");
+      throw redirect({ to: "/login" });
     }
   },
   loader: async ({ context }) => {
@@ -270,37 +271,35 @@ function MyFavouritesPage() {
             <CardTitle>Notification Settings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium">Include out-of-stock items in messages</p>
-                <p className="text-sm text-muted-foreground">
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel>Include out-of-stock items in messages</FieldLabel>
+                <FieldDescription>
                   When enabled, stock update messages will also list your favourited matcha that are currently out of
                   stock.
-                </p>
-              </div>
-              <div>
-                <Switch
-                  checked={settings.includeOosInMessage}
-                  disabled={updateSettingsMutation.isPending}
-                  onCheckedChange={(checked) => updateSettingsMutation.mutate({ includeOosInMessage: checked })}
-                />
-              </div>
-            </div>
+                </FieldDescription>
+              </FieldContent>
+              <Switch
+                checked={settings.includeOosInMessage}
+                disabled={updateSettingsMutation.isPending}
+                onCheckedChange={(checked) => updateSettingsMutation.mutate({ includeOosInMessage: checked })}
+              />
+            </Field>
           </CardContent>
         </Card>
       )}
 
       {favourites.length === 0 ? (
-        <Card>
-          <CardContent>
-            <div className="text-center py-8 space-y-2">
-              <p className="text-muted-foreground">You haven't favourited any listings yet.</p>
-              <Button variant="link" asChild>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>You haven't favourited any listings yet</EmptyTitle>
+            <EmptyDescription>
+              <Button variant="link" asChild className="p-0 h-auto">
                 <Link to="/">Browse listings</Link>
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <DataTable
           data={favourites}
@@ -317,7 +316,7 @@ function MyFavouritesPage() {
           <CardTitle>How notifications work</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="space-y-4 text-sm text-muted-foreground">
             <p>
               At each scrape interval, you'll receive a{" "}
               <span className="font-medium text-foreground">Telegram message per storefront</span> when one or more of
