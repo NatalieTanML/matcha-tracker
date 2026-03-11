@@ -30,12 +30,14 @@ function ListingCard({
   onToggle,
   isToggling,
   formatLastChecked,
+  session,
 }: {
   listing: any;
   isTracked: boolean;
   isToggling: boolean;
   onToggle: (id: string) => void;
   formatLastChecked: (date: Date | null | undefined) => string;
+  session: any;
 }) {
   return (
     <Card className="hover:shadow-lg transition-shadow group/card border ring-0" key={listing.id}>
@@ -63,23 +65,25 @@ function ListingCard({
         <Badge variant={listing.lastStock ? "success" : "destructive"}>
           {listing.lastStock ? "In Stock" : "Out of Stock"}
         </Badge>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onToggle(listing.id)}
-            disabled={isToggling}
-            className={
-              isToggling
-                ? "opacity-50"
-                : isTracked
-                  ? "text-destructive hover:text-gray-500"
-                  : "text-muted-foreground hover:text-destructive"
-            }
-          >
-            <HeartIcon size={20} weight={isTracked ? "fill" : "regular"} />
-          </Button>
-        </div>
+        {session && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onToggle(listing.id)}
+              disabled={isToggling}
+              className={
+                isToggling
+                  ? "opacity-50"
+                  : isTracked
+                    ? "text-destructive hover:text-gray-500"
+                    : "text-muted-foreground hover:text-destructive"
+              }
+            >
+              <HeartIcon size={20} weight={isTracked ? "fill" : "regular"} />
+            </Button>
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
@@ -352,6 +356,7 @@ function App() {
               isToggling={togglingId === listing.id}
               onToggle={handleToggleTracking}
               formatLastChecked={formatLastChecked}
+              session={session}
             />
           ))}
         </div>
